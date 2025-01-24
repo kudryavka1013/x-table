@@ -1,0 +1,21 @@
+{
+  "name": "x-table",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "private": true,
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kudryavka1013/x-table.git"
+  },
+  "author": "kudryavka1013",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/kudryavka1013/x-table/issues"
+  },
+  "homepage": "https://github.com/kudryavka1013/x-table#readme"
+}
