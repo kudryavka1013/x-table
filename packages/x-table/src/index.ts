@@ -1,7 +1,7 @@
 import { ICounter } from "./types";
 import { createBaseTable, createRow } from "../../../libs/utils";
 
-export default class BaseTable {
+export default class XTable {
   /* DOM Nodes */
   table: HTMLTableElement;
   colgroup: HTMLTableColElement;
@@ -61,6 +61,7 @@ export default class BaseTable {
     const { rows } = this.getTableSize();
     for (let i = 0; i < rows; i++) {
       const td = document.createElement("td");
+      console.log(td);
     }
   }
 
