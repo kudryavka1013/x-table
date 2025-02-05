@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import XTable from './../../x-table/src/index';
+import XTable from '../../packages/x-table/src/index';
 
 function App() {
   const tableRef = useRef<HTMLDivElement>(null);

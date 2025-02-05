@@ -8,7 +8,7 @@ importers:
 
   .: {}
 
-  packages/demo:
+  example:
     dependencies:
       react:
         specifier: ^18.3.1
@@ -18,7 +18,7 @@ importers:
         version: 18.3.1(react@18.3.1)
       x-table:
         specifier: workspace:^
-        version: link:../..
+        version: link:..
     devDependencies:
       '@eslint/js':
         specifier: ^9.17.0
