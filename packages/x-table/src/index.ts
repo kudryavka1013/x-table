@@ -1,6 +1,5 @@
 import { ICounter } from "./types";
 import $ from "./dom";
-import "./index.css";
 
 const CSS = {
   wrapper: "x-table-wrapper",

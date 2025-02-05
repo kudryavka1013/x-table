@@ -1,12 +1,12 @@
 import { useEffect, useRef } from "react";
-import XTable from '../../packages/x-table/src/index';
+import XTable from "@kudryavka1013/x-table";
 
 function App() {
   const tableRef = useRef<HTMLDivElement>(null);
   const actionRef = useRef<XTable>();
 
   useEffect(() => {
-    console.log("useEffect"); 
+    console.log("useEffect");
     const table = new XTable(3, 3);
     actionRef.current = table;
     tableRef.current?.appendChild(table.getTable().table);
