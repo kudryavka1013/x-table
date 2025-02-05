@@ -1,5 +1,5 @@
 import { defineConfig } from "vite";
-import dts from 'vite-plugin-dts';
+import dts from "vite-plugin-dts";
 
 // https://vite.dev/config/
 export default defineConfig({
@@ -21,5 +21,5 @@ export default defineConfig({
     //   },
     // },
   },
-  plugins: [dts()],
+  plugins: [dts({ rollupTypes: true, tsconfigPath: "./tsconfig.json" })],
 });
