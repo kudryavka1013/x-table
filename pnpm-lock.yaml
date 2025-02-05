@@ -16,6 +16,9 @@ importers:
       react-dom:
         specifier: ^18.3.1
         version: 18.3.1(react@18.3.1)
+      x-table:
+        specifier: workspace:^
+        version: link:../..
     devDependencies:
       '@eslint/js':
         specifier: ^9.17.0

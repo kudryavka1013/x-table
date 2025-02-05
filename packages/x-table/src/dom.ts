@@ -1,6 +1,6 @@
 /* base DOM operation utils */
 
-/* create an element */
+/** create an element */
 const make = <T extends keyof HTMLElementTagNameMap>(
   tagName: T,
   className?: string | string[]
@@ -10,7 +10,7 @@ const make = <T extends keyof HTMLElementTagNameMap>(
   return elem as HTMLElementTagNameMap[T];
 };
 
-/* multiple append elements */
+/** multiple append elements */
 const append = <T extends HTMLElement | DocumentFragment>(
   wrapper: T,
   elem: HTMLElement | HTMLElement[]
@@ -21,7 +21,7 @@ const append = <T extends HTMLElement | DocumentFragment>(
   return wrapper;
 };
 
-/* batch append elements by generatorFunc */
+/** batch append elements by generatorFunc */
 const batchAppend = (
   wrapper: HTMLElement | DocumentFragment,
   elem: () => HTMLElement | HTMLElement[],
@@ -32,7 +32,7 @@ const batchAppend = (
   }
 };
 
-/* generate element tree */
+/** generate element tree */
 const linkAppend = (...elems: HTMLElement[]) => {
   elems.reduce((p, c) => p.appendChild(c));
 };

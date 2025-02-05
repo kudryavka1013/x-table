@@ -1,4 +1,4 @@
-import dom from "./dom";
+import dom from "../packages/x-table/src/dom";
 
 const CSS = {
   wrapper: "x-table-wrapper",
@@ -27,7 +27,7 @@ const CSS = {
 };
 
 /**
- * 创建基本表格元素
+ * Create base table elements
  */
 export const createBaseTable = () => {
   const table = dom.make("table", [CSS.table, CSS.tableFixed]);
@@ -44,31 +44,32 @@ export const createBaseTable = () => {
 };
 
 /**
- * Create table cell
+ * Create table td element
  */
-const createCell = (
-  renderFunc?: (td: HTMLTableCellElement) => void
+export const createCell = (
+  cellRender?: (td: HTMLTableCellElement) => void
 ): HTMLTableCellElement => {
   const td = dom.make("td", CSS.td);
-  if (renderFunc) renderFunc(td);
-
+  if (cellRender) {
+    cellRender(td);
+  }
   return td;
 };
 
 /**
- * Create tr and fill cells
+ * Create tr and fill td elements
  */
 export const createRow = (
-  numberOfColumns: number,
+  numOfCols: number,
   cellRender?: (td: HTMLTableCellElement) => void
 ): HTMLTableRowElement => {
   const row = dom.make("tr", CSS.row);
-  dom.batchAppend(row, () => createCell(cellRender), numberOfColumns);
+  dom.batchAppend(row, () => createCell(cellRender), numOfCols);
   return row;
 };
 
 /**
- * Create colwidth
+ * Create colgroup-col element
  */
 export const createColWidth = (width?: number): HTMLTableColElement => {
   const col = dom.make("col");
