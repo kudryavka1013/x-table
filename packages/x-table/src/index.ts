@@ -1,8 +1,10 @@
 import { ICounter } from "./types";
 import $ from "./dom";
+// will be export
+import "./index.css";
 
 const CSS = {
-  wrapper: "x-table-wrapper",
+  // wrapper: "x-table-wrapper",
   // scrollableWrapper: "x-table-scrollable-wrapper",
   // scrollableContainer: "x-table-scrollable-container",
   table: "x-table",
@@ -34,7 +36,7 @@ export default class XTable {
   tbody: HTMLTableSectionElement;
   /* Counter */
   counter: ICounter;
-
+  /* Custom cell render function */
   cellRender?: (td: HTMLTableCellElement) => void;
 
   constructor(
@@ -59,14 +61,14 @@ export default class XTable {
     const { rows } = this.getTableSize();
     /* fill TRs and TDs */
     for (let i = 0; i < rows; i++) {
-      this.addRow(-1, this.cellRender);
+      this.addRow(-1);
     }
   }
 
   initColgroup() {
     const { cols } = this.getTableSize();
     for (let i = 0; i < cols; i++) {
-      const col = document.createElement("col");
+      const col = this.createCol();
       this.colgroup.appendChild(col);
     }
   }
@@ -75,9 +77,9 @@ export default class XTable {
     return this.counter;
   }
 
-  addRow(index = -1, renderCell?: (td: HTMLTableCellElement) => void) {
+  addRow(index = -1) {
     const { cols } = this.getTableSize();
-    const newRow = this.createRow(cols, renderCell);
+    const newRow = this.createRow(cols);
 
     /* 找到index对应的当前行位置，在前面插一个空行 */
     if (index > 0 && index <= cols) {
@@ -88,10 +90,10 @@ export default class XTable {
     }
   }
 
-  addCol(index = -1, renderCell?: (td: HTMLTableCellElement) => void) {
+  addCol(index = -1) {
     const { rows, cols } = this.getTableSize();
     for (let i = 0; i < rows; i++) {
-      const td = this.createCell(renderCell);
+      const td = this.createCell();
       const curRow = this.getRow(i + 1);
       const curTd = this.getCell(i + 1, index);
       if (index > 0 && index <= cols) {
@@ -102,6 +104,7 @@ export default class XTable {
     }
   }
 
+  /* ----- Getters ----- */
   getTable() {
     return {
       table: this.table,
@@ -143,12 +146,10 @@ export default class XTable {
   /**
    * Create table td element
    */
-  createCell = (
-    cellRender?: (td: HTMLTableCellElement) => void
-  ): HTMLTableCellElement => {
+  createCell = (): HTMLTableCellElement => {
     const td = $.make("td", CSS.cell);
-    if (cellRender) {
-      cellRender(td);
+    if (this.cellRender) {
+      this.cellRender(td);
     } else {
       td.setAttribute("contenteditable", "true");
     }
@@ -158,13 +159,19 @@ export default class XTable {
   /**
    * Create tr and fill td elements
    */
-  createRow = (
-    numOfCols: number,
-    cellRender?: (td: HTMLTableCellElement) => void
-  ): HTMLTableRowElement => {
+  createRow = (numOfCols: number): HTMLTableRowElement => {
     const row = $.make("tr", CSS.row);
-    console.log(cellRender);
-    $.batchAppend(row, () => this.createCell(cellRender), numOfCols);
+    $.batchAppend(row, () => this.createCell(), numOfCols);
     return row;
+  };
+
+  /**
+   * Create colgroup-col element
+   */
+  createCol = (width?: number): HTMLTableColElement => {
+    const col = $.make("col");
+    col.style.width = width ? `${width}px` : "100px";
+    console.log(col)
+    return col;
   };
 }
