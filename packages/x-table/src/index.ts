@@ -73,10 +73,6 @@ export default class XTable {
     }
   }
 
-  getTableSize() {
-    return this.counter;
-  }
-
   addRow(index = -1) {
     const { cols } = this.getTableSize();
     const newRow = this.createRow(cols);
@@ -113,6 +109,10 @@ export default class XTable {
     };
   }
 
+  getTableSize() {
+    return this.counter;
+  }
+
   getRow(row: number) {
     return this.tbody.querySelector<HTMLTableRowElement>(
       `tr:nth-child(${row})`
@@ -123,6 +123,21 @@ export default class XTable {
     return this.tbody.querySelector<HTMLTableCellElement>(
       `tr:nth-child(${row}) td:nth-child(${col})`
     );
+  }
+
+  getData() {
+    const { rows, cols } = this.getTableSize();
+    const data: string[][] = [];
+    for (let i = 0; i < rows; i++) {
+      const rowData: string[] = [];
+      for (let j = 0; j < cols; j++) {
+        const cell = this.getCell(i + 1, j + 1);
+        if (!cell) continue;
+        rowData.push(cell.innerText);
+      }
+      data.push(rowData);
+    }
+    return data;
   }
 
   /* ----- DOM Operations ----- */
@@ -171,7 +186,6 @@ export default class XTable {
   createCol = (width?: number): HTMLTableColElement => {
     const col = $.make("col");
     col.style.width = width ? `${width}px` : "100px";
-    console.log(col)
     return col;
   };
 }
