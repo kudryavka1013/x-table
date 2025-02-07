@@ -27,14 +27,35 @@ export const CSS = {
   // toolbox: "x-table-toolbox",
 };
 
+interface MergeState {
+  merged: boolean;
+  /* the top-left one is the main cell */
+  mainCell: string;
+  rowspan: number;
+  colspan: number;
+}
+
 export default class XTable {
   /* DOM Nodes */
   private table: HTMLTableElement;
   private colgroup: HTMLTableColElement;
   private tbody: HTMLTableSectionElement;
-  /* Counter */
+  /* Table Data */
   private rowCnt: number;
   private colCnt: number;
+  /** Merge State
+   * - Key format: 'rowIndex-columnIndex'
+   */
+  private mergeState: Map<string, MergeState>;
+  /** Select State
+   * start cell index and end cell index, start from 1
+   */
+  private selectState: {
+    startRow: number;
+    startCol: number;
+    endRow: number;
+    endCol: number;
+  };
   /* Custom cell render function */
   cellRender: (td: HTMLTableCellElement) => void;
 
@@ -49,7 +70,13 @@ export default class XTable {
     this.tbody = tbody;
     this.rowCnt = rows;
     this.colCnt = cols;
-
+    this.mergeState = new Map();
+    this.selectState = {
+      startRow: -1,
+      startCol: -1,
+      endRow: -1,
+      endCol: -1,
+    };
     this.cellRender = cellRender ? cellRender : this.defaultCellRender;
     this.initTableCells();
     this.initColgroup();
@@ -146,6 +173,26 @@ export default class XTable {
     }
   }
 
+  setSelectState(
+    startPosition: [number, number],
+    endPosition: [number, number]
+  ) {
+    // if opposite selection action, revert coordinates
+    const [a, b] = startPosition;
+    const [x, y] = endPosition;
+
+    let [startRow, endRow] = x - a >= 0 ? [a, x] : [x, a];
+    let [startColumn, endColumn] = y - b >= 0 ? [b, y] : [y, b];
+
+    this.computeRealRange();
+  }
+
+  computeRealRange() {}
+
+  mergeCells() {}
+
+  splitCell(position: [number, number]) {}
+
   /* ----- Getters ----- */
   getTable() {
     return {
@@ -178,6 +225,10 @@ export default class XTable {
     return this.colgroup.querySelector<HTMLTableColElement>(
       `col:nth-child(${col})`
     );
+  }
+
+  getMergeData() {
+    return this.mergeState;
   }
 
   getData() {
@@ -217,6 +268,8 @@ export default class XTable {
    */
   createCell = (): HTMLTableCellElement => {
     const td = $.make("td", CSS.cell);
+    td.setAttribute("rowspan", "1");
+    td.setAttribute("colspan", "1");
     this.cellRender(td);
     return td;
   };
