@@ -10,7 +10,7 @@ const make = <T extends keyof HTMLElementTagNameMap>(
   return elem as HTMLElementTagNameMap[T];
 };
 
-/** multiple append elements */
+/** append multiple elements */
 const append = <T extends HTMLElement | DocumentFragment>(
   wrapper: T,
   elem: HTMLElement | HTMLElement[]
@@ -21,7 +21,7 @@ const append = <T extends HTMLElement | DocumentFragment>(
   return wrapper;
 };
 
-/** batch append elements by generatorFunc */
+/** batch append elements by generator function */
 const batchAppend = (
   wrapper: HTMLElement | DocumentFragment,
   elem: () => HTMLElement | HTMLElement[],
@@ -32,11 +32,12 @@ const batchAppend = (
   }
 };
 
-/** generate element tree */
+/** combine elements and generate tree */
 const linkAppend = (...elems: HTMLElement[]) => {
   elems.reduce((p, c) => p.appendChild(c));
 };
 
+/** add multiple classnames */
 const addClass = (elem: HTMLElement, className: string | string[]) => {
   Array.isArray(className)
     ? elem.classList.add(...className)
