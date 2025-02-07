@@ -1,6 +1,4 @@
-import { ICounter } from "./types";
 import $ from "./dom";
-// will be export
 import "./index.css";
 
 const CSS = {
@@ -10,6 +8,7 @@ const CSS = {
   table: "x-table",
   // tableFixed: "x-table--fixed",
   colgroup: "x-table-colgroup",
+  col: "x-table-col",
   tbody: "x-table-tbody",
   row: "x-table-row",
   cell: "x-table-cell",
@@ -31,13 +30,14 @@ const CSS = {
 
 export default class XTable {
   /* DOM Nodes */
-  table: HTMLTableElement;
-  colgroup: HTMLTableColElement;
-  tbody: HTMLTableSectionElement;
+  private table: HTMLTableElement;
+  private colgroup: HTMLTableColElement;
+  private tbody: HTMLTableSectionElement;
   /* Counter */
-  counter: ICounter;
+  private rowCnt: number;
+  private colCnt: number;
   /* Custom cell render function */
-  cellRender?: (td: HTMLTableCellElement) => void;
+  cellRender: (td: HTMLTableCellElement) => void;
 
   constructor(
     rows: number,
@@ -48,14 +48,17 @@ export default class XTable {
     this.table = table;
     this.colgroup = colgroup;
     this.tbody = tbody;
-    this.counter = {
-      rows,
-      cols,
-    };
-    this.cellRender = cellRender;
+    this.rowCnt = rows;
+    this.colCnt = cols;
+
+    this.cellRender = cellRender ? cellRender : this.defaultCellRender;
     this.initTableCells();
     this.initColgroup();
   }
+
+  defaultCellRender = (td: HTMLTableCellElement) => {
+    td.setAttribute("contenteditable", "true");
+  };
 
   initTableCells() {
     const { rows } = this.getTableSize();
@@ -73,30 +76,74 @@ export default class XTable {
     }
   }
 
+  /* ----- Table Operations ----- */
   addRow(index = -1) {
     const { cols } = this.getTableSize();
     const newRow = this.createRow(cols);
 
-    /* 找到index对应的当前行位置，在前面插一个空行 */
+    /* 找到 index 对应的当前行位置，在前面插一个空行 */
     if (index > 0 && index <= cols) {
       const row = this.getRow(index);
       this.tbody.insertBefore(newRow, row);
     } else {
       this.tbody.appendChild(newRow);
     }
+
+    /* update counter */
+    this.rowCnt++;
   }
 
-  addCol(index = -1) {
+  addColumn(index = -1) {
     const { rows, cols } = this.getTableSize();
     for (let i = 0; i < rows; i++) {
       const td = this.createCell();
       const curRow = this.getRow(i + 1);
-      const curTd = this.getCell(i + 1, index);
       if (index > 0 && index <= cols) {
+        const curTd = this.getCell(i + 1, index);
         curRow?.insertBefore(td, curTd);
       } else {
         curRow?.appendChild(td);
       }
+    }
+
+    /* update colgroup */
+    const col = this.createCol();
+    if (index > 0 && index <= cols) {
+      const curCol = this.colgroup.children[index - 1];
+      this.colgroup.insertBefore(col, curCol);
+    } else {
+      this.colgroup.appendChild(col);
+    }
+
+    /* update counter */
+    this.colCnt++;
+  }
+
+  deleteRow(index: number) {
+    const { rows } = this.getTableSize();
+    if (index <= 0 || index > rows) return;
+    const row = this.getRow(index);
+    if (row) {
+      row.remove();
+      this.rowCnt--;
+    }
+  }
+
+  deleteColumn(index: number) {
+    const { rows, cols } = this.getTableSize();
+    if (index <= 0 || index > cols) return;
+
+    for (let i = 0; i < rows; i++) {
+      const cell = this.getCell(i + 1, index);
+      if (cell) {
+        cell.remove();
+      }
+    }
+
+    const col = this.getCol(index);
+    if (col) {
+      col.remove();
+      this.colCnt--;
     }
   }
 
@@ -110,7 +157,10 @@ export default class XTable {
   }
 
   getTableSize() {
-    return this.counter;
+    return {
+      rows: this.rowCnt,
+      cols: this.colCnt,
+    };
   }
 
   getRow(row: number) {
@@ -122,6 +172,12 @@ export default class XTable {
   getCell(row: number, col: number) {
     return this.tbody.querySelector<HTMLTableCellElement>(
       `tr:nth-child(${row}) td:nth-child(${col})`
+    );
+  }
+
+  getCol(col: number) {
+    return this.colgroup.querySelector<HTMLTableColElement>(
+      `col:nth-child(${col})`
     );
   }
 
@@ -148,7 +204,6 @@ export default class XTable {
     const table = $.make("table", [CSS.table]);
     const colgroup = $.make("colgroup", CSS.colgroup);
     const tbody = $.make("tbody", CSS.tbody);
-
     $.append(table, [colgroup, tbody]);
 
     return {
@@ -163,11 +218,7 @@ export default class XTable {
    */
   createCell = (): HTMLTableCellElement => {
     const td = $.make("td", CSS.cell);
-    if (this.cellRender) {
-      this.cellRender(td);
-    } else {
-      td.setAttribute("contenteditable", "true");
-    }
+    this.cellRender(td);
     return td;
   };
 
@@ -183,9 +234,12 @@ export default class XTable {
   /**
    * Create colgroup-col element
    */
-  createCol = (width?: number): HTMLTableColElement => {
-    const col = $.make("col");
+  createCol = (width?: number, span?: number): HTMLTableColElement => {
+    const col = $.make("col", CSS.col);
     col.style.width = width ? `${width}px` : "100px";
+    if (span) {
+      col.setAttribute("span", `${span}`);
+    }
     return col;
   };
 }
