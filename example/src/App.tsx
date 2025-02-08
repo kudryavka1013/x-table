@@ -1,6 +1,7 @@
 import { useEffect, useRef } from "react";
 import XTable from "@kudryavka1013/x-table";
 import "@kudryavka1013/x-table/x-table.css";
+import { CSS } from "@kudryavka1013/x-table";
 
 function App() {
   const tableRef = useRef<HTMLDivElement>(null);
@@ -23,19 +24,21 @@ function App() {
     console.log("onAddRow");
     console.log(actionRef.current);
     actionRef.current?.addRow(1);
-  }
+  };
 
   const onDelCol = () => {
     console.log("onDelCol");
     console.log(actionRef.current);
     actionRef.current?.deleteColumn(1);
-  }
+  };
 
   const onDelRow = () => {
     console.log("onDelRow");
     console.log(actionRef.current);
     actionRef.current?.deleteRow(1);
-  }
+  };
+
+  console.log(CSS);
 
   return (
     <>
@@ -43,7 +46,7 @@ function App() {
       <div>
         <button onClick={onAddCol}>addCol</button>
         <button onClick={onAddRow}>addRow</button>
-        
+
         <button onClick={onDelCol}>delCol</button>
         <button onClick={onDelRow}>delRow</button>
       </div>

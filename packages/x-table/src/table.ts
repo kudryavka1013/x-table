@@ -72,10 +72,10 @@ export default class XTable {
     this.colCnt = cols;
     this.mergeState = new Map();
     this.selectState = {
-      startRow: -1,
-      startCol: -1,
-      endRow: -1,
-      endCol: -1,
+      startRow: 0,
+      startCol: 0,
+      endRow: 0,
+      endCol: 0,
     };
     this.cellRender = cellRender ? cellRender : this.defaultCellRender;
     this.initTableCells();
@@ -184,12 +184,20 @@ export default class XTable {
     let [startRow, endRow] = x - a >= 0 ? [a, x] : [x, a];
     let [startColumn, endColumn] = y - b >= 0 ? [b, y] : [y, b];
 
-    this.computeRealRange();
+    this.computeRealRange([startRow, startColumn], [endRow, endColumn]);
   }
 
-  computeRealRange() {}
+  computeRealRange(
+    startPosition: [number, number],
+    endPosition: [number, number]
+  ) {
+    // compute real select range by merge state
+    this.computeRealRange(startPosition, endPosition);
+  }
 
-  mergeCells() {}
+  mergeCells(startPosition: [number, number], endPosition: [number, number]) {
+    // need to be real select range
+  }
 
   splitCell(position: [number, number]) {}
 
