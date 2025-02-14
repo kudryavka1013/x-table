@@ -44,6 +44,12 @@ function App() {
     actionRef.current?.mergeCells([1, 1], [2, 2]);
   }
 
+  const onSplit = () => {
+    console.log("onSplit");
+    console.log(actionRef.current);
+    actionRef.current?.splitCell([1, 1]);
+  }
+
   console.log(CSS);
 
   return (
@@ -57,6 +63,7 @@ function App() {
         <button onClick={onDelRow}>delRow</button>
 
         <button onClick={onMerge}>merge</button>
+        <button onClick={onSplit}>split</button>
       </div>
       <div ref={tableRef}></div>
     </>

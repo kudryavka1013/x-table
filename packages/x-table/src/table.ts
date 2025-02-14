@@ -29,7 +29,6 @@ export const CSS = {
 };
 
 interface MergeState {
-  mergedBy?: string;
   rowspan: number;
   colspan: number;
 }
@@ -204,13 +203,8 @@ export default class XTable {
     });
 
     for (let i = 0; i < mergeKeys.length; i++) {
-      const { rowspan, colspan, mergedBy } = this.mergeState.get(mergeKeys[i])!;
+      const { rowspan, colspan } = this.mergeState.get(mergeKeys[i])!;
       // expand range to cover merged cells
-      if (mergedBy) {
-        const [row, col] = mergedBy.split("-").map(Number);
-        newStartRow = row < startRow ? row : startRow;
-        newStartColumn = col < startColumn ? col : startColumn;
-      }
       const [row, col] = mergeKeys[i].split("-").map(Number);
       newEndRow = row + rowspan - 1 > endRow ? row + rowspan - 1 : endRow;
       newEndColumn = col + colspan - 1 > endColumn ? col + colspan - 1 : endColumn;
@@ -240,7 +234,6 @@ export default class XTable {
             cell.setAttribute("rowspan", `${endRow - startRow + 1}`);
             cell.setAttribute("colspan", `${endCol - startCol + 1}`);
             this.mergeState.set(`${i}-${j}`, {
-              mergedBy: undefined,
               rowspan: endRow - startRow + 1,
               colspan: endCol - startCol + 1,
             });
@@ -248,11 +241,7 @@ export default class XTable {
             cell.classList.add(CSS.cellMerged);
             cell.setAttribute("rowspan", "1");
             cell.setAttribute("colspan", "1");
-            this.mergeState.set(`${i}-${j}`, {
-              mergedBy: `${startRow}-${startCol}`,
-              rowspan: 1,
-              colspan: 1,
-            });
+            this.mergeState.delete(`${i}-${j}`);
           }
         }
       }
@@ -260,7 +249,25 @@ export default class XTable {
   }
 
   splitCell(position: [number, number]) {
-    console.log(position);
+    const mergeState = this.mergeState.get(position.join("-"));
+    if (mergeState) {
+      const { rowspan, colspan } = mergeState;
+      // show merged cells
+      for (let i = 0; i < rowspan; i++) {
+        for (let j = 0; j < colspan; j++) {
+          const cell = this.getCell(position[0] + i, position[1] + j);
+          if (cell) {
+            if (i === 0 && j === 0) {
+              cell.setAttribute("rowspan", "1");
+              cell.setAttribute("colspan", "1");
+            } else {
+              cell.classList.remove(CSS.cellMerged);
+            }
+          }
+        }
+      }
+      this.mergeState.delete(position.join("-"));
+    }
   }
 
   /* ----- Getters ----- */
