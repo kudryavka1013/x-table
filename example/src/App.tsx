@@ -38,6 +38,12 @@ function App() {
     actionRef.current?.deleteRow(1);
   };
 
+  const onMerge = () => {
+    console.log("onMerge");
+    console.log(actionRef.current);
+    actionRef.current?.mergeCells([1, 1], [2, 2]);
+  }
+
   console.log(CSS);
 
   return (
@@ -49,6 +55,8 @@ function App() {
 
         <button onClick={onDelCol}>delCol</button>
         <button onClick={onDelRow}>delRow</button>
+
+        <button onClick={onMerge}>merge</button>
       </div>
       <div ref={tableRef}></div>
     </>

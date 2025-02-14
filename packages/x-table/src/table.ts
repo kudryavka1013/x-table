@@ -11,6 +11,7 @@ export const CSS = {
   tbody: "x-table-tbody",
   row: "x-table-row",
   cell: "x-table-cell",
+  cellMerged: "x-table-cell--merged",
   // cellContentWrapper: "x-cell-content-wrapper",
   // cellSafeArea: "x-cell-safe-area",
   // cellContentBlock: "x-cell-content-block",
@@ -28,9 +29,7 @@ export const CSS = {
 };
 
 interface MergeState {
-  merged: boolean;
-  /* the top-left one is the main cell */
-  mainCell: string;
+  mergedBy?: string;
   rowspan: number;
   colspan: number;
 }
@@ -59,11 +58,7 @@ export default class XTable {
   /* Custom cell render function */
   cellRender: (td: HTMLTableCellElement) => void;
 
-  constructor(
-    rows: number,
-    cols: number,
-    cellRender?: (td: HTMLTableCellElement) => void
-  ) {
+  constructor(rows: number, cols: number, cellRender?: (td: HTMLTableCellElement) => void) {
     const { table, colgroup, tbody } = this.createBaseTable();
     this.table = table;
     this.colgroup = colgroup;
@@ -173,10 +168,7 @@ export default class XTable {
     }
   }
 
-  setSelectState(
-    startPosition: [number, number],
-    endPosition: [number, number]
-  ) {
+  setSelectState(startPosition: [number, number], endPosition: [number, number]) {
     // if opposite selection action, revert coordinates
     const [a, b] = startPosition;
     const [x, y] = endPosition;
@@ -184,22 +176,92 @@ export default class XTable {
     let [startRow, endRow] = x - a >= 0 ? [a, x] : [x, a];
     let [startColumn, endColumn] = y - b >= 0 ? [b, y] : [y, b];
 
-    this.computeRealRange([startRow, startColumn], [endRow, endColumn]);
+    const realRange = this.computeRealRange(startRow, startColumn, endRow, endColumn);
+    console.log(realRange);
+    this.selectState = {
+      startRow: realRange.startPosition[0],
+      startCol: realRange.startPosition[1],
+      endRow: realRange.endPosition[0],
+      endCol: realRange.endPosition[1],
+    };
   }
 
+  /** compute real select range by merge state */
   computeRealRange(
-    startPosition: [number, number],
-    endPosition: [number, number]
-  ) {
-    // compute real select range by merge state
-    this.computeRealRange(startPosition, endPosition);
+    startRow: number,
+    startColumn: number,
+    endRow: number,
+    endColumn: number
+  ): { startPosition: [number, number]; endPosition: [number, number] } {
+    let newStartRow = startRow,
+      newStartColumn = startColumn,
+      newEndRow = endRow,
+      newEndColumn = endColumn;
+    // get merge state
+    const mergeKeys = Array.from(this.mergeState.keys()).filter((key) => {
+      const [row, col] = key.split("-").map(Number);
+      return row >= startRow && row <= endRow && col >= startColumn && col <= endColumn;
+    });
+
+    for (let i = 0; i < mergeKeys.length; i++) {
+      const { rowspan, colspan, mergedBy } = this.mergeState.get(mergeKeys[i])!;
+      // expand range to cover merged cells
+      if (mergedBy) {
+        const [row, col] = mergedBy.split("-").map(Number);
+        newStartRow = row < startRow ? row : startRow;
+        newStartColumn = col < startColumn ? col : startColumn;
+      }
+      const [row, col] = mergeKeys[i].split("-").map(Number);
+      newEndRow = row + rowspan - 1 > endRow ? row + rowspan - 1 : endRow;
+      newEndColumn = col + colspan - 1 > endColumn ? col + colspan - 1 : endColumn;
+    }
+
+    if (newStartRow === startRow && newStartColumn === startColumn && newEndRow === endRow && newEndColumn === endColumn) {
+      return {
+        startPosition: [startRow, startColumn],
+        endPosition: [endRow, endColumn],
+      };
+    } else {
+      return this.computeRealRange(newStartRow, newStartColumn, newEndRow, newEndColumn);
+    }
   }
 
   mergeCells(startPosition: [number, number], endPosition: [number, number]) {
     // need to be real select range
+    this.setSelectState(startPosition, endPosition);
+    const { startRow, startCol, endRow, endCol } = this.selectState;
+    // set rowspan colspan
+    // hide merged cells
+    for (let i = startRow; i <= endRow; i++) {
+      for (let j = startCol; j <= endCol; j++) {
+        const cell = this.getCell(i, j);
+        if (cell) {
+          if (i === startRow && j === startCol) {
+            cell.setAttribute("rowspan", `${endRow - startRow + 1}`);
+            cell.setAttribute("colspan", `${endCol - startCol + 1}`);
+            this.mergeState.set(`${i}-${j}`, {
+              mergedBy: undefined,
+              rowspan: endRow - startRow + 1,
+              colspan: endCol - startCol + 1,
+            });
+          } else {
+            cell.classList.add(CSS.cellMerged);
+            cell.setAttribute("rowspan", "1");
+            cell.setAttribute("colspan", "1");
+            this.mergeState.set(`${i}-${j}`, {
+              mergedBy: `${startRow}-${startCol}`,
+              rowspan: 1,
+              colspan: 1,
+            });
+          }
+        }
+      }
+    }
   }
 
-  splitCell(position: [number, number]) {}
+  splitCell(position: [number, number]) {
+    console.log(position);
+  }
 
   /* ----- Getters ----- */
   getTable() {
@@ -218,21 +280,15 @@ export default class XTable {
   }
 
   getRow(row: number) {
-    return this.tbody.querySelector<HTMLTableRowElement>(
-      `tr:nth-child(${row})`
-    );
+    return this.tbody.querySelector<HTMLTableRowElement>(`tr:nth-child(${row})`);
   }
 
   getCell(row: number, col: number) {
-    return this.tbody.querySelector<HTMLTableCellElement>(
-      `tr:nth-child(${row}) td:nth-child(${col})`
-    );
+    return this.tbody.querySelector<HTMLTableCellElement>(`tr:nth-child(${row}) td:nth-child(${col})`);
   }
 
   getCol(col: number) {
-    return this.colgroup.querySelector<HTMLTableColElement>(
-      `col:nth-child(${col})`
-    );
+    return this.colgroup.querySelector<HTMLTableColElement>(`col:nth-child(${col})`);
   }
 
   getMergeData() {
