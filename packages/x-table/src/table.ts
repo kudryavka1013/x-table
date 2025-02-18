@@ -313,10 +313,10 @@ export default class XTable {
             } else {
               cell.classList.remove(CSS.cellMerged);
             }
+            delete this.mergeInfo[`${position[0] + i},${position[1] + j}`];
           }
         }
       }
-      delete this.mergeInfo[position.join(",")];
     }
   }
 
