@@ -9,7 +9,7 @@ function App() {
 
   useEffect(() => {
     console.log("useEffect");
-    const table = new XTable(3, 3);
+    const table = new XTable([], 3, 3);
     actionRef.current = table;
     tableRef.current?.appendChild(table.getTable().table);
   }, []);
@@ -17,13 +17,13 @@ function App() {
   const onAddCol = () => {
     console.log("onAddCol");
     console.log(actionRef.current);
-    actionRef.current?.addColumn(1);
+    actionRef.current?.addColumn(2);
   };
 
   const onAddRow = () => {
     console.log("onAddRow");
     console.log(actionRef.current);
-    actionRef.current?.addRow(1);
+    actionRef.current?.addRow(2);
   };
 
   const onDelCol = () => {
@@ -41,15 +41,19 @@ function App() {
   const onMerge = () => {
     console.log("onMerge");
     console.log(actionRef.current);
-    actionRef.current?.mergeCells([1, 1], [2, 2]);
-  }
+    actionRef.current?.mergeCells([1, 1], [2, 3]);
+  };
 
   const onSplit = () => {
     console.log("onSplit");
     console.log(actionRef.current);
     actionRef.current?.splitCell([1, 1]);
-  }
+  };
 
+  const logData = () => {
+    console.log(actionRef.current?.getTableSize());
+    console.log(actionRef.current?.getMergeInfo());
+  }
   console.log(CSS);
 
   return (
@@ -64,6 +68,8 @@ function App() {
 
         <button onClick={onMerge}>merge</button>
         <button onClick={onSplit}>split</button>
+
+        <button onClick={logData}>logData</button>
       </div>
       <div ref={tableRef}></div>
     </>

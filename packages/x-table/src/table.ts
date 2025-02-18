@@ -31,6 +31,7 @@ export const CSS = {
 interface MergeState {
   rowspan: number;
   colspan: number;
+  mergedBy?: string;
 }
 
 export default class XTable {
@@ -39,12 +40,13 @@ export default class XTable {
   private colgroup: HTMLTableColElement;
   private tbody: HTMLTableSectionElement;
   /* Table Data */
+  private data: string[][];
   private rowCnt: number;
   private colCnt: number;
   /** Merge State
-   * - Key format: 'rowIndex-columnIndex'
+   * - Key format: 'rowIndex,columnIndex'
    */
-  private mergeState: Map<string, MergeState>;
+  private mergeInfo: Record<string, MergeState>;
   /** Select State
    * start cell index and end cell index, start from 1
    */
@@ -57,14 +59,15 @@ export default class XTable {
   /* Custom cell render function */
   cellRender: (td: HTMLTableCellElement) => void;
 
-  constructor(rows: number, cols: number, cellRender?: (td: HTMLTableCellElement) => void) {
+  constructor(data: string[][], rows: number, cols: number, cellRender?: (td: HTMLTableCellElement) => void) {
     const { table, colgroup, tbody } = this.createBaseTable();
     this.table = table;
     this.colgroup = colgroup;
     this.tbody = tbody;
-    this.rowCnt = rows;
+    this.data = data;
+    this.rowCnt = 0;
     this.colCnt = cols;
-    this.mergeState = new Map();
+    this.mergeInfo = {};
     this.selectState = {
       startRow: 0,
       startCol: 0,
@@ -72,7 +75,7 @@ export default class XTable {
       endCol: 0,
     };
     this.cellRender = cellRender ? cellRender : this.defaultCellRender;
-    this.initTableCells();
+    this.initTableCells(rows);
     this.initColgroup();
   }
 
@@ -80,11 +83,11 @@ export default class XTable {
     td.setAttribute("contenteditable", "true");
   };
 
-  initTableCells() {
-    const { rows } = this.getTableSize();
+  initTableCells(rows: number) {
+    // const { rows } = this.getTableSize();
     /* fill TRs and TDs */
     for (let i = 0; i < rows; i++) {
-      this.addRow(-1);
+      this.addRow(0);
     }
   }
 
@@ -96,24 +99,64 @@ export default class XTable {
     }
   }
 
+  /* ----- Utils ----- */
+  updateMergeInfo(rIndex = 0, cIndex = 0) {
+    const mergeInfo = JSON.parse(JSON.stringify(this.mergeInfo));
+    const newMergeInfo: Record<string, MergeState> = {};
+
+    for (const key in mergeInfo) {
+      const [row, col] = key.split(",").map(Number);
+      const { rowspan, colspan, mergedBy } = mergeInfo[key];
+
+      // rIndex < row => 插入行在当前格子的上方
+      // cIndex < col => 插入列在当前格子的左侧
+      const newRow = rIndex && rIndex <= row ? row + 1 : row;
+      const newCol = cIndex && cIndex <= col ? col + 1 : col;
+
+      if (mergedBy) {
+        newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key] };
+        if (cIndex === col || rIndex === row) {
+          newMergeInfo[`${row},${col}`] = { ...mergeInfo[key] };
+          this.getCell(row, col)?.classList.add(CSS.cellMerged);
+        }
+      } else {
+        // 合并单元格
+        // 插入行列穿过合并单元格时，更新合并单元格的 rowspan colspan
+        const newRowspan = rIndex && rIndex <= row - 1 + rowspan ? rowspan + 1 : rowspan;
+        const newColspan = cIndex && cIndex <= col - 1 + colspan ? colspan + 1 : colspan;
+        const cell = this.getCell(row, col);
+        if (cell) {
+          cell.setAttribute("rowspan", `${newRowspan}`);
+          cell.setAttribute("colspan", `${newColspan}`);
+        }
+        newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
+      }
+    }
+
+    return newMergeInfo;
+  }
+
   /* ----- Table Operations ----- */
-  addRow(index = -1) {
+  addRow(index = 0) {
     const { cols } = this.getTableSize();
     const newRow = this.createRow(cols);
 
-    /* 找到 index 对应的当前行位置，在前面插一个空行 */
     if (index > 0 && index <= cols) {
+      /* non-zero, find index and insert before */
       const row = this.getRow(index);
       this.tbody.insertBefore(newRow, row);
+      /* update mergeInfo */
+      this.mergeInfo = this.updateMergeInfo(index, 0);
     } else {
+      /* zero, add row to the end */
       this.tbody.appendChild(newRow);
     }
-
+    console.log(this.rowCnt);
     /* update counter */
     this.rowCnt++;
   }
 
-  addColumn(index = -1) {
+  addColumn(index = 0) {
     const { rows, cols } = this.getTableSize();
     for (let i = 0; i < rows; i++) {
       const td = this.createCell();
@@ -125,6 +168,9 @@ export default class XTable {
         curRow?.appendChild(td);
       }
     }
+
+    /* update mergeInfo */
+    this.mergeInfo = this.updateMergeInfo(0, index);
 
     /* update colgroup */
     const col = this.createCol();
@@ -197,15 +243,15 @@ export default class XTable {
       newEndRow = endRow,
       newEndColumn = endColumn;
     // get merge state
-    const mergeKeys = Array.from(this.mergeState.keys()).filter((key) => {
-      const [row, col] = key.split("-").map(Number);
+    const mergeKeys = Object.keys(this.mergeInfo).filter((key) => {
+      const [row, col] = key.split(",").map(Number);
       return row >= startRow && row <= endRow && col >= startColumn && col <= endColumn;
     });
 
     for (let i = 0; i < mergeKeys.length; i++) {
-      const { rowspan, colspan } = this.mergeState.get(mergeKeys[i])!;
+      const { rowspan, colspan } = this.mergeInfo[mergeKeys[i]]!;
       // expand range to cover merged cells
-      const [row, col] = mergeKeys[i].split("-").map(Number);
+      const [row, col] = mergeKeys[i].split(",").map(Number);
       newEndRow = row + rowspan - 1 > endRow ? row + rowspan - 1 : endRow;
       newEndColumn = col + colspan - 1 > endColumn ? col + colspan - 1 : endColumn;
     }
@@ -233,15 +279,19 @@ export default class XTable {
           if (i === startRow && j === startCol) {
             cell.setAttribute("rowspan", `${endRow - startRow + 1}`);
             cell.setAttribute("colspan", `${endCol - startCol + 1}`);
-            this.mergeState.set(`${i}-${j}`, {
+            this.mergeInfo[`${i},${j}`] = {
               rowspan: endRow - startRow + 1,
               colspan: endCol - startCol + 1,
-            });
+            };
           } else {
             cell.classList.add(CSS.cellMerged);
             cell.setAttribute("rowspan", "1");
             cell.setAttribute("colspan", "1");
-            this.mergeState.delete(`${i}-${j}`);
+            this.mergeInfo[`${i},${j}`] = {
+              rowspan: 1,
+              colspan: 1,
+              mergedBy: `${startRow},${startCol}`,
+            };
           }
         }
       }
@@ -249,7 +299,7 @@ export default class XTable {
   }
 
   splitCell(position: [number, number]) {
-    const mergeState = this.mergeState.get(position.join("-"));
+    const mergeState = this.mergeInfo[position.join(",")];
     if (mergeState) {
       const { rowspan, colspan } = mergeState;
       // show merged cells
@@ -266,7 +316,7 @@ export default class XTable {
           }
         }
       }
-      this.mergeState.delete(position.join("-"));
+      delete this.mergeInfo[position.join(",")];
     }
   }
 
@@ -298,8 +348,8 @@ export default class XTable {
     return this.colgroup.querySelector<HTMLTableColElement>(`col:nth-child(${col})`);
   }
 
-  getMergeData() {
-    return this.mergeState;
+  getMergeInfo() {
+    return this.mergeInfo;
   }
 
   getData() {
@@ -314,6 +364,7 @@ export default class XTable {
       }
       data.push(rowData);
     }
+    console.log(this.data);
     return data;
   }
 
