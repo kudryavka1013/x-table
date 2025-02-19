@@ -28,6 +28,8 @@ export const CSS = {
   // toolbox: "x-table-toolbox",
 };
 
+type UpdateMergeInfoType = "addRow" | "addColumn" | "deleteRow" | "deleteColumn";
+
 interface MergeState {
   rowspan: number;
   colspan: number;
@@ -84,7 +86,6 @@ export default class XTable {
   };
 
   initTableCells(rows: number) {
-    // const { rows } = this.getTableSize();
     /* fill TRs and TDs */
     for (let i = 0; i < rows; i++) {
       this.addRow(0);
@@ -100,137 +101,6 @@ export default class XTable {
   }
 
   /* ----- Utils ----- */
-  updateMergeInfo(rIndex = 0, cIndex = 0) {
-    const mergeInfo = JSON.parse(JSON.stringify(this.mergeInfo));
-    const newMergeInfo: Record<string, MergeState> = {};
-
-    for (const key in mergeInfo) {
-      const [row, col] = key.split(",").map(Number);
-      const { rowspan, colspan, mergedBy } = mergeInfo[key];
-
-      // rIndex < row => 插入行在当前格子的上方
-      // cIndex < col => 插入列在当前格子的左侧
-      const newRow = rIndex && rIndex <= row ? row + 1 : row;
-      const newCol = cIndex && cIndex <= col ? col + 1 : col;
-
-      if (mergedBy) {
-        newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key] };
-        if (cIndex === col || rIndex === row) {
-          newMergeInfo[`${row},${col}`] = { ...mergeInfo[key] };
-          this.getCell(row, col)?.classList.add(CSS.cellMerged);
-        }
-      } else {
-        // 合并单元格
-        // 插入行列穿过合并单元格时，更新合并单元格的 rowspan colspan
-        const newRowspan = rIndex && rIndex <= row - 1 + rowspan ? rowspan + 1 : rowspan;
-        const newColspan = cIndex && cIndex <= col - 1 + colspan ? colspan + 1 : colspan;
-        const cell = this.getCell(row, col);
-        if (cell) {
-          cell.setAttribute("rowspan", `${newRowspan}`);
-          cell.setAttribute("colspan", `${newColspan}`);
-        }
-        newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
-      }
-    }
-
-    return newMergeInfo;
-  }
-
-  /* ----- Table Operations ----- */
-  addRow(index = 0) {
-    const { cols } = this.getTableSize();
-    const newRow = this.createRow(cols);
-
-    if (index > 0 && index <= cols) {
-      /* non-zero, find index and insert before */
-      const row = this.getRow(index);
-      this.tbody.insertBefore(newRow, row);
-      /* update mergeInfo */
-      this.mergeInfo = this.updateMergeInfo(index, 0);
-    } else {
-      /* zero, add row to the end */
-      this.tbody.appendChild(newRow);
-    }
-    console.log(this.rowCnt);
-    /* update counter */
-    this.rowCnt++;
-  }
-
-  addColumn(index = 0) {
-    const { rows, cols } = this.getTableSize();
-    for (let i = 0; i < rows; i++) {
-      const td = this.createCell();
-      const curRow = this.getRow(i + 1);
-      if (index > 0 && index <= cols) {
-        const curTd = this.getCell(i + 1, index);
-        curRow?.insertBefore(td, curTd);
-      } else {
-        curRow?.appendChild(td);
-      }
-    }
-
-    /* update mergeInfo */
-    this.mergeInfo = this.updateMergeInfo(0, index);
-
-    /* update colgroup */
-    const col = this.createCol();
-    if (index > 0 && index <= cols) {
-      const curCol = this.colgroup.children[index - 1];
-      this.colgroup.insertBefore(col, curCol);
-    } else {
-      this.colgroup.appendChild(col);
-    }
-
-    /* update counter */
-    this.colCnt++;
-  }
-
-  deleteRow(index: number) {
-    const { rows } = this.getTableSize();
-    if (index <= 0 || index > rows) return;
-    const row = this.getRow(index);
-    if (row) {
-      row.remove();
-      this.rowCnt--;
-    }
-  }
-
-  deleteColumn(index: number) {
-    const { rows, cols } = this.getTableSize();
-    if (index <= 0 || index > cols) return;
-
-    for (let i = 0; i < rows; i++) {
-      const cell = this.getCell(i + 1, index);
-      if (cell) {
-        cell.remove();
-      }
-    }
-
-    const col = this.getCol(index);
-    if (col) {
-      col.remove();
-      this.colCnt--;
-    }
-  }
-
-  setSelectState(startPosition: [number, number], endPosition: [number, number]) {
-    // if opposite selection action, revert coordinates
-    const [a, b] = startPosition;
-    const [x, y] = endPosition;
-
-    let [startRow, endRow] = x - a >= 0 ? [a, x] : [x, a];
-    let [startColumn, endColumn] = y - b >= 0 ? [b, y] : [y, b];
-
-    const realRange = this.computeRealRange(startRow, startColumn, endRow, endColumn);
-    console.log(realRange);
-    this.selectState = {
-      startRow: realRange.startPosition[0],
-      startCol: realRange.startPosition[1],
-      endRow: realRange.endPosition[0],
-      endCol: realRange.endPosition[1],
-    };
-  }
-
   /** compute real select range by merge state */
   computeRealRange(
     startRow: number,
@@ -264,6 +134,181 @@ export default class XTable {
     } else {
       return this.computeRealRange(newStartRow, newStartColumn, newEndRow, newEndColumn);
     }
+  }
+
+  /** update merge info after modifying table */
+  updateMergeInfo(type: UpdateMergeInfoType, index: number) {
+    const mergeInfo = JSON.parse(JSON.stringify(this.mergeInfo));
+    const newMergeInfo: Record<string, MergeState> = {};
+
+    for (const key in mergeInfo) {
+      const isRowOperation = type === "addRow" || type === "deleteRow";
+      const [row, col] = key.split(",").map(Number);
+      const { rowspan, colspan, mergedBy } = mergeInfo[key];
+      // revert if need
+      const [pos, rPos] = isRowOperation ? [row, col] : [col, row];
+
+      switch (type) {
+        case "addRow":
+        case "addColumn":
+          const span = isRowOperation ? rowspan : colspan;
+
+          // rowIndex < row => 插入行在当前格子的上方
+          // columnIndex < col => 插入列在当前格子的左侧
+          let newPos = index <= pos ? pos + 1 : pos;
+          let [newRow, newCol] = isRowOperation ? [newPos, rPos] : [rPos, newPos];
+
+          if (mergedBy) {
+            newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key] };
+            if (index === pos) {
+              newMergeInfo[`${row},${col}`] = { ...mergeInfo[key] };
+              this.getCell(row, col)?.classList.add(CSS.cellMerged);
+            }
+          } else {
+            // 合并单元格
+            const newSpan = index <= pos - 1 + span ? span + 1 : span;
+            // 插入行列穿过合并单元格时，更新合并单元格的 rowspan colspan
+            const [newRowspan, newColspan] = isRowOperation ? [newSpan, span] : [span, newSpan];
+            const cell = this.getCell(row, col);
+            if (cell) {
+              cell.setAttribute("rowspan", `${newRowspan}`);
+              cell.setAttribute("colspan", `${newColspan}`);
+            }
+            newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
+          }
+          break;
+        case "deleteRow":
+        case "deleteColumn":
+          if (mergedBy) {
+            // let newPos = index <= pos ? pos - 1 : pos;
+            // const [newRow, newCol] = isRowOperation ? [newPos, rPos] : [rPos, newPos];
+            // newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key] };
+            // if (index === pos) {
+            //   // 啥也不用干，新 info 不添加当前格子信息
+            // } else {
+            // }
+          } else {
+            // 删除行列为合并单元格本体行列时，清除合并单元格的数据
+            if (index === pos) {
+              continue;
+            }
+
+            // 删除行列影响合并单元格本体坐标时，更新合并单元格的坐标
+            // rowIndex < row => 删除行在当前格子的上方
+            // columnIndex < col => 删除列在当前格子的左侧
+            let newPos = index <= pos ? pos - 1 : pos;
+            const [newRow, newCol] = isRowOperation ? [newPos, rPos] : [rPos, newPos];
+            if (newPos === pos) {
+              // 删除行列穿过合并单元格时，更新合并单元格的 rowspan colspan
+            } else {
+              newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key] };
+            }
+          }
+      }
+    }
+
+    return newMergeInfo;
+  }
+
+  /* ----- Table Operations ----- */
+  addRow(index = 0) {
+    const { cols } = this.getTableSize();
+    const newRow = this.createRow(cols);
+
+    if (index > 0 && index <= cols) {
+      /* non-zero, find index and insert before */
+      const row = this.getRow(index);
+      this.tbody.insertBefore(newRow, row);
+      /* update mergeInfo */
+      this.mergeInfo = this.updateMergeInfo("addRow", index);
+    } else {
+      /* zero, add row to the end */
+      this.tbody.appendChild(newRow);
+    }
+    console.log(this.rowCnt);
+    /* update counter */
+    this.rowCnt++;
+  }
+
+  addColumn(index = 0) {
+    const { rows, cols } = this.getTableSize();
+    for (let i = 0; i < rows; i++) {
+      const td = this.createCell();
+      const curRow = this.getRow(i + 1);
+      if (index > 0 && index <= cols) {
+        const curTd = this.getCell(i + 1, index);
+        curRow?.insertBefore(td, curTd);
+      } else {
+        curRow?.appendChild(td);
+      }
+    }
+
+    /* update mergeInfo */
+    this.mergeInfo = this.updateMergeInfo("addColumn", index);
+
+    /* update colgroup */
+    const col = this.createCol();
+    if (index > 0 && index <= cols) {
+      const curCol = this.colgroup.children[index - 1];
+      this.colgroup.insertBefore(col, curCol);
+    } else {
+      this.colgroup.appendChild(col);
+    }
+
+    /* update counter */
+    this.colCnt++;
+  }
+
+  deleteRow(index: number) {
+    const { rows } = this.getTableSize();
+    if (index <= 0 || index > rows) return;
+    const row = this.getRow(index);
+    if (row) {
+      row.remove();
+      this.rowCnt--;
+    }
+
+    /* update mergeInfo */
+    this.mergeInfo = this.updateMergeInfo("deleteRow", index);
+  }
+
+  deleteColumn(index: number) {
+    const { rows, cols } = this.getTableSize();
+    if (index <= 0 || index > cols) return;
+
+    for (let i = 0; i < rows; i++) {
+      const cell = this.getCell(i + 1, index);
+      if (cell) {
+        cell.remove();
+      }
+    }
+
+    /* update mergeInfo */
+    this.mergeInfo = this.updateMergeInfo("deleteColumn", index);
+
+    const col = this.getCol(index);
+    if (col) {
+      col.remove();
+      this.colCnt--;
+    }
+  }
+
+  setSelectState(startPosition: [number, number], endPosition: [number, number]) {
+    // if opposite selection action, revert coordinates
+    const [a, b] = startPosition;
+    const [x, y] = endPosition;
+
+    let [startRow, endRow] = x - a >= 0 ? [a, x] : [x, a];
+    let [startColumn, endColumn] = y - b >= 0 ? [b, y] : [y, b];
+
+    const realRange = this.computeRealRange(startRow, startColumn, endRow, endColumn);
+    console.log(realRange);
+    this.selectState = {
+      startRow: realRange.startPosition[0],
+      startCol: realRange.startPosition[1],
+      endRow: realRange.endPosition[0],
+      endCol: realRange.endPosition[1],
+    };
   }
 
   mergeCells(startPosition: [number, number], endPosition: [number, number]) {
