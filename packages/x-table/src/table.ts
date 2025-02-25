@@ -33,7 +33,6 @@ type UpdateMergeInfoType = "addRow" | "addColumn" | "deleteRow" | "deleteColumn"
 interface MergeState {
   rowspan: number;
   colspan: number;
-  mergedBy?: string;
 }
 
 export default class XTable {
@@ -101,6 +100,11 @@ export default class XTable {
   }
 
   /* ----- Utils ----- */
+  /** get position index */
+  getIndex(position: string) {
+    return position.split(",").map(Number);
+  }
+
   /** compute real select range by merge state */
   computeRealRange(
     startRow: number,
@@ -143,10 +147,14 @@ export default class XTable {
 
     for (const key in mergeInfo) {
       const isRowOperation = type === "addRow" || type === "deleteRow";
+      const isAddOperation = type === "addRow" || type === "addColumn";
       const [row, col] = key.split(",").map(Number);
-      const { rowspan, colspan, mergedBy } = mergeInfo[key];
+      const { rowspan, colspan } = mergeInfo[key];
       // revert if need
       const [pos, rPos] = isRowOperation ? [row, col] : [col, row];
+
+      const newPos = isAddOperation ? index <= pos ? pos + 1 : pos : index <= pos ? pos - 1 : pos;
+      const [newRow, newCol] = isRowOperation ? [newPos, rPos] : [rPos, newPos];
 
       switch (type) {
         case "addRow":
@@ -155,62 +163,48 @@ export default class XTable {
 
           // rowIndex < row => 插入行在当前格子的上方
           // columnIndex < col => 插入列在当前格子的左侧
-          let newPos = index <= pos ? pos + 1 : pos;
-          let [newRow, newCol] = isRowOperation ? [newPos, rPos] : [rPos, newPos];
 
-          if (mergedBy) {
-            newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key] };
-            if (index === pos) {
-              newMergeInfo[`${row},${col}`] = { ...mergeInfo[key] };
-              this.getCell(row, col)?.classList.add(CSS.cellMerged);
-            }
-          } else {
-            // 合并单元格
-            const newSpan = index <= pos - 1 + span ? span + 1 : span;
-            // 插入行列穿过合并单元格时，更新合并单元格的 rowspan colspan
-            const [newRowspan, newColspan] = isRowOperation ? [newSpan, rspan] : [rspan, newSpan];
-            const cell = this.getCell(row, col);
+          // 合并单元格
+          const newSpan = index <= pos - 1 + span ? span + 1 : span;
+          const counter = isRowOperation ? colspan : rowspan;
+          for (let i = 0; i < counter; i++) {
+            const cell = isRowOperation ? this.getCell(index, col + i) : this.getCell(row + i, index);
             if (cell) {
-              cell.setAttribute("rowspan", `${newRowspan}`);
-              cell.setAttribute("colspan", `${newColspan}`);
+              cell.classList.add(CSS.cellMerged);
             }
-            newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
           }
+          // 插入行列穿过合并单元格时，更新合并单元格的 rowspan colspan
+          const [newRowspan, newColspan] = isRowOperation ? [newSpan, rspan] : [rspan, newSpan];
+          const cell = this.getCell(row, col);
+          if (cell) {
+            cell.setAttribute("rowspan", `${newRowspan}`);
+            cell.setAttribute("colspan", `${newColspan}`);
+          }
+          newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
+
           break;
         case "deleteRow":
         case "deleteColumn":
-          if (mergedBy) {
-            // let newPos = index <= pos ? pos - 1 : pos;
-            // const [newRow, newCol] = isRowOperation ? [newPos, rPos] : [rPos, newPos];
-            // newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key] };
-            // if (index === pos) {
-            //   // 啥也不用干，新 info 不添加当前格子信息
-            // } else {
-            // }
-          } else {
-            // 删除行列为合并单元格本体行列时，清除被合并的单元格的样式数据
-            if (index === pos) {
-              for (let i = 0; i < rowspan; i++) {
-                for (let j = 0; j < colspan; j++) {
-                  const cell = this.getCell(row + i, col + j);
-                  if (cell) {
-                    cell.classList.remove(CSS.cellMerged);
-                  }
+          // 删除行列为合并单元格本体行列时，清除被合并的单元格的样式数据
+          if (index === pos) {
+            for (let i = 0; i < rowspan; i++) {
+              for (let j = 0; j < colspan; j++) {
+                const cell = this.getCell(row + i, col + j);
+                if (cell) {
+                  cell.classList.remove(CSS.cellMerged);
                 }
               }
-              continue;
             }
+            continue;
+          }
 
-            // 删除行列影响合并单元格本体坐标时，更新合并单元格的坐标
-            // rowIndex < row => 删除行在当前格子的上方
-            // columnIndex < col => 删除列在当前格子的左侧
-            let newPos = index <= pos ? pos - 1 : pos;
-            const [newRow, newCol] = isRowOperation ? [newPos, rPos] : [rPos, newPos];
-            if (newPos === pos) {
-              // 删除行列穿过合并单元格时，更新合并单元格的 rowspan colspan
-            } else {
-              newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key] };
-            }
+          // 删除行列影响合并单元格本体坐标时，更新合并单元格的坐标
+          // rowIndex < row => 删除行在当前格子的上方
+          // columnIndex < col => 删除列在当前格子的左侧
+          if (newPos === pos) {
+            // 删除行列穿过合并单元格时，更新合并单元格的 rowspan colspan
+          } else {
+            newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key] };
           }
       }
     }
@@ -341,11 +335,6 @@ export default class XTable {
             cell.classList.add(CSS.cellMerged);
             cell.setAttribute("rowspan", "1");
             cell.setAttribute("colspan", "1");
-            this.mergeInfo[`${i},${j}`] = {
-              rowspan: 1,
-              colspan: 1,
-              mergedBy: `${startRow},${startCol}`,
-            };
           }
         }
       }
