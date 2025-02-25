@@ -17,25 +17,25 @@ function App() {
   const onAddCol = () => {
     console.log("onAddCol");
     console.log(actionRef.current);
-    actionRef.current?.addColumn(2);
+    actionRef.current?.addColumn(5);
   };
 
   const onAddRow = () => {
     console.log("onAddRow");
     console.log(actionRef.current);
-    actionRef.current?.addRow(2);
+    actionRef.current?.addRow(5);
   };
 
   const onDelCol = () => {
     console.log("onDelCol");
     console.log(actionRef.current);
-    actionRef.current?.deleteColumn(1);
+    actionRef.current?.deleteColumn(2);
   };
 
   const onDelRow = () => {
     console.log("onDelRow");
     console.log(actionRef.current);
-    actionRef.current?.deleteRow(1);
+    actionRef.current?.deleteRow(2);
   };
 
   const onMerge = () => {

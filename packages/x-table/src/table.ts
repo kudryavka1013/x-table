@@ -148,44 +148,50 @@ export default class XTable {
     for (const key in mergeInfo) {
       const isRowOperation = type === "addRow" || type === "deleteRow";
       const isAddOperation = type === "addRow" || type === "addColumn";
-      const [row, col] = key.split(",").map(Number);
+      // get row and column index
+      const [row, col] = this.getIndex(key);
+      // get rowspan and colspan
       const { rowspan, colspan } = mergeInfo[key];
-      // revert if need
+      // revert position if need
       const [pos, rPos] = isRowOperation ? [row, col] : [col, row];
-
-      const newPos = isAddOperation ? index <= pos ? pos + 1 : pos : index <= pos ? pos - 1 : pos;
+      // revert span if need
+      const [span, rspan] = isRowOperation ? [rowspan, colspan] : [colspan, rowspan];
+      // calculate new position
+      const newPos = isAddOperation ? (index <= pos ? pos + 1 : pos) : index <= pos ? pos - 1 : pos;
+      // calculate new row and column index
       const [newRow, newCol] = isRowOperation ? [newPos, rPos] : [rPos, newPos];
 
       switch (type) {
         case "addRow":
         case "addColumn":
-          const [span, rspan] = isRowOperation ? [rowspan, colspan] : [colspan, rowspan];
+          const newSpan = index > pos && index <= pos - 1 + span ? span + 1 : span;
+          const [newRowspan, newColspan] = isRowOperation ? [newSpan, rspan] : [rspan, newSpan];
 
-          // rowIndex < row => 插入行在当前格子的上方
-          // columnIndex < col => 插入列在当前格子的左侧
-
-          // 合并单元格
-          const newSpan = index <= pos - 1 + span ? span + 1 : span;
-          const counter = isRowOperation ? colspan : rowspan;
-          for (let i = 0; i < counter; i++) {
-            const cell = isRowOperation ? this.getCell(index, col + i) : this.getCell(row + i, index);
+          // 插入行列穿过合并单元格时
+          if (newSpan !== span) {
+            // 新增的单元格调整合并样式
+            const counter = isRowOperation ? colspan : rowspan;
+            for (let i = 0; i < counter; i++) {
+              const cell = isRowOperation ? this.getCell(index, col + i) : this.getCell(row + i, index);
+              if (cell) {
+                cell.classList.add(CSS.cellMerged);
+              }
+            }
+            // 更新合并单元格的 rowspan colspan
+            const cell = this.getCell(row, col);
             if (cell) {
-              cell.classList.add(CSS.cellMerged);
+              cell.setAttribute("rowspan", `${newRowspan}`);
+              cell.setAttribute("colspan", `${newColspan}`);
             }
           }
-          // 插入行列穿过合并单元格时，更新合并单元格的 rowspan colspan
-          const [newRowspan, newColspan] = isRowOperation ? [newSpan, rspan] : [rspan, newSpan];
-          const cell = this.getCell(row, col);
-          if (cell) {
-            cell.setAttribute("rowspan", `${newRowspan}`);
-            cell.setAttribute("colspan", `${newColspan}`);
+          // 更新 map 数据
+          if (newRowspan !== 1 || newColspan !== 1) {
+            newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
           }
-          newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
-
           break;
         case "deleteRow":
         case "deleteColumn":
-          // 删除行列为合并单元格本体行列时，清除被合并的单元格的样式数据
+          // 删除行列为合并单元格本体行列时，清除被合并的单元格的样式数据，无需再记录 map
           if (index === pos) {
             for (let i = 0; i < rowspan; i++) {
               for (let j = 0; j < colspan; j++) {
@@ -195,16 +201,22 @@ export default class XTable {
                 }
               }
             }
-            continue;
-          }
-
-          // 删除行列影响合并单元格本体坐标时，更新合并单元格的坐标
-          // rowIndex < row => 删除行在当前格子的上方
-          // columnIndex < col => 删除列在当前格子的左侧
-          if (newPos === pos) {
-            // 删除行列穿过合并单元格时，更新合并单元格的 rowspan colspan
           } else {
-            newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key] };
+            const newSpan = index > pos && index <= pos - 1 + span ? span - 1 : span;
+            const [newRowspan, newColspan] = isRowOperation ? [newSpan, rspan] : [rspan, newSpan];
+            // 插入行列穿过合并单元格时
+            if (newSpan !== span) {
+              // 更新合并单元格的 rowspan colspan
+              const cell = this.getCell(row, col);
+              if (cell) {
+                cell.setAttribute("rowspan", `${newRowspan}`);
+                cell.setAttribute("colspan", `${newColspan}`);
+              }
+            }
+            // 更新 map 数据
+            if (newRowspan !== 1 || newColspan !== 1) {
+              newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
+            }
           }
       }
     }
