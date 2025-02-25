@@ -67,7 +67,7 @@ export default class XTable {
     this.colgroup = colgroup;
     this.tbody = tbody;
     this.data = data;
-    this.rowCnt = 0;
+    this.rowCnt = rows;
     this.colCnt = cols;
     this.mergeInfo = {};
     this.selectState = {
@@ -88,7 +88,7 @@ export default class XTable {
   initTableCells(rows: number) {
     /* fill TRs and TDs */
     for (let i = 0; i < rows; i++) {
-      this.addRow(0);
+      this.addRow(0, true);
     }
   }
 
@@ -151,7 +151,7 @@ export default class XTable {
       switch (type) {
         case "addRow":
         case "addColumn":
-          const span = isRowOperation ? rowspan : colspan;
+          const [span, rspan] = isRowOperation ? [rowspan, colspan] : [colspan, rowspan];
 
           // rowIndex < row => 插入行在当前格子的上方
           // columnIndex < col => 插入列在当前格子的左侧
@@ -168,7 +168,7 @@ export default class XTable {
             // 合并单元格
             const newSpan = index <= pos - 1 + span ? span + 1 : span;
             // 插入行列穿过合并单元格时，更新合并单元格的 rowspan colspan
-            const [newRowspan, newColspan] = isRowOperation ? [newSpan, span] : [span, newSpan];
+            const [newRowspan, newColspan] = isRowOperation ? [newSpan, rspan] : [rspan, newSpan];
             const cell = this.getCell(row, col);
             if (cell) {
               cell.setAttribute("rowspan", `${newRowspan}`);
@@ -188,8 +188,16 @@ export default class XTable {
             // } else {
             // }
           } else {
-            // 删除行列为合并单元格本体行列时，清除合并单元格的数据
+            // 删除行列为合并单元格本体行列时，清除被合并的单元格的样式数据
             if (index === pos) {
+              for (let i = 0; i < rowspan; i++) {
+                for (let j = 0; j < colspan; j++) {
+                  const cell = this.getCell(row + i, col + j);
+                  if (cell) {
+                    cell.classList.remove(CSS.cellMerged);
+                  }
+                }
+              }
               continue;
             }
 
@@ -211,7 +219,7 @@ export default class XTable {
   }
 
   /* ----- Table Operations ----- */
-  addRow(index = 0) {
+  addRow(index = 0, init = false) {
     const { cols } = this.getTableSize();
     const newRow = this.createRow(cols);
 
@@ -225,9 +233,10 @@ export default class XTable {
       /* zero, add row to the end */
       this.tbody.appendChild(newRow);
     }
-    console.log(this.rowCnt);
     /* update counter */
-    this.rowCnt++;
+    if (!init) {
+      this.rowCnt++;
+    }
   }
 
   addColumn(index = 0) {
