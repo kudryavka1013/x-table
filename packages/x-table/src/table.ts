@@ -160,13 +160,14 @@ export default class XTable {
       const newPos = isAddOperation ? (index <= pos ? pos + 1 : pos) : index <= pos ? pos - 1 : pos;
       // calculate new row and column index
       const [newRow, newCol] = isRowOperation ? [newPos, rPos] : [rPos, newPos];
+      // calculate new span
+      const newSpan = index > pos && index <= pos - 1 + span ? (isAddOperation ? span + 1 : span - 1) : span;
+      // calculate new rowspan and colspan
+      const [newRowspan, newColspan] = isRowOperation ? [newSpan, rspan] : [rspan, newSpan];
 
       switch (type) {
         case "addRow":
         case "addColumn":
-          const newSpan = index > pos && index <= pos - 1 + span ? span + 1 : span;
-          const [newRowspan, newColspan] = isRowOperation ? [newSpan, rspan] : [rspan, newSpan];
-
           // 插入行列穿过合并单元格时
           if (newSpan !== span) {
             // 新增的单元格调整合并样式
@@ -202,8 +203,6 @@ export default class XTable {
               }
             }
           } else {
-            const newSpan = index > pos && index <= pos - 1 + span ? span - 1 : span;
-            const [newRowspan, newColspan] = isRowOperation ? [newSpan, rspan] : [rspan, newSpan];
             // 插入行列穿过合并单元格时
             if (newSpan !== span) {
               // 更新合并单元格的 rowspan colspan
