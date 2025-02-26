@@ -165,59 +165,97 @@ export default class XTable {
       // calculate new rowspan and colspan
       const [newRowspan, newColspan] = isRowOperation ? [newSpan, rspan] : [rspan, newSpan];
 
-      switch (type) {
-        case "addRow":
-        case "addColumn":
-          // 插入行列穿过合并单元格时
-          if (newSpan !== span) {
-            // 新增的单元格调整合并样式
-            const counter = isRowOperation ? colspan : rowspan;
-            for (let i = 0; i < counter; i++) {
-              const cell = isRowOperation ? this.getCell(index, col + i) : this.getCell(row + i, index);
-              if (cell) {
-                cell.classList.add(CSS.cellMerged);
-              }
-            }
-            // 更新合并单元格的 rowspan colspan
-            const cell = this.getCell(row, col);
+      // 删除行列为合并单元格本体行列时，清除被合并的单元格的样式数据，无需再记录 map
+      if (!isAddOperation && index === pos) {
+        for (let i = 0; i < rowspan; i++) {
+          for (let j = 0; j < colspan; j++) {
+            const cell = this.getCell(row + i, col + j);
             if (cell) {
-              cell.setAttribute("rowspan", `${newRowspan}`);
-              cell.setAttribute("colspan", `${newColspan}`);
+              cell.classList.remove(CSS.cellMerged);
             }
           }
-          // 更新 map 数据
-          if (newRowspan !== 1 || newColspan !== 1) {
-            newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
-          }
-          break;
-        case "deleteRow":
-        case "deleteColumn":
-          // 删除行列为合并单元格本体行列时，清除被合并的单元格的样式数据，无需再记录 map
-          if (index === pos) {
-            for (let i = 0; i < rowspan; i++) {
-              for (let j = 0; j < colspan; j++) {
-                const cell = this.getCell(row + i, col + j);
-                if (cell) {
-                  cell.classList.remove(CSS.cellMerged);
-                }
-              }
-            }
-          } else {
-            // 插入行列穿过合并单元格时
-            if (newSpan !== span) {
-              // 更新合并单元格的 rowspan colspan
-              const cell = this.getCell(row, col);
-              if (cell) {
-                cell.setAttribute("rowspan", `${newRowspan}`);
-                cell.setAttribute("colspan", `${newColspan}`);
-              }
-            }
-            // 更新 map 数据
-            if (newRowspan !== 1 || newColspan !== 1) {
-              newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
-            }
-          }
+        }
+        continue;
       }
+      // 插入的行列穿过合并单元格时，新增的单元格调整合并样式
+      if (isAddOperation && newSpan !== span) {
+        const counter = isRowOperation ? colspan : rowspan;
+        for (let i = 0; i < counter; i++) {
+          const cell = isRowOperation ? this.getCell(index, col + i) : this.getCell(row + i, index);
+          if (cell) {
+            cell.classList.add(CSS.cellMerged);
+          }
+        }
+      }
+
+      /* 通用处理 */
+      // 插入/删除的行列穿过合并单元格时
+      if (newSpan !== span) {
+        // 更新合并单元格的 rowspan colspan
+        const cell = this.getCell(row, col);
+        if (cell) {
+          cell.setAttribute("rowspan", `${newRowspan}`);
+          cell.setAttribute("colspan", `${newColspan}`);
+        }
+      }
+      // 更新 map 数据
+      if (newRowspan !== 1 || newColspan !== 1) {
+        newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
+      }
+
+      // switch (type) {
+      //   case "addRow":
+      //   case "addColumn":
+      //     // 插入行列穿过合并单元格时
+      //     if (newSpan !== span) {
+      //       // 新增的单元格调整合并样式
+      //       const counter = isRowOperation ? colspan : rowspan;
+      //       for (let i = 0; i < counter; i++) {
+      //         const cell = isRowOperation ? this.getCell(index, col + i) : this.getCell(row + i, index);
+      //         if (cell) {
+      //           cell.classList.add(CSS.cellMerged);
+      //         }
+      //       }
+      //       // 更新合并单元格的 rowspan colspan
+      //       const cell = this.getCell(row, col);
+      //       if (cell) {
+      //         cell.setAttribute("rowspan", `${newRowspan}`);
+      //         cell.setAttribute("colspan", `${newColspan}`);
+      //       }
+      //     }
+      //     // 更新 map 数据
+      //     if (newRowspan !== 1 || newColspan !== 1) {
+      //       newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
+      //     }
+      //     break;
+      //   case "deleteRow":
+      //   case "deleteColumn":
+      //     // 删除行列为合并单元格本体行列时，清除被合并的单元格的样式数据，无需再记录 map
+      //     if (index === pos) {
+      //       for (let i = 0; i < rowspan; i++) {
+      //         for (let j = 0; j < colspan; j++) {
+      //           const cell = this.getCell(row + i, col + j);
+      //           if (cell) {
+      //             cell.classList.remove(CSS.cellMerged);
+      //           }
+      //         }
+      //       }
+      //     } else {
+      //       // 插入行列穿过合并单元格时
+      //       if (newSpan !== span) {
+      //         // 更新合并单元格的 rowspan colspan
+      //         const cell = this.getCell(row, col);
+      //         if (cell) {
+      //           cell.setAttribute("rowspan", `${newRowspan}`);
+      //           cell.setAttribute("colspan", `${newColspan}`);
+      //         }
+      //       }
+      //       // 更新 map 数据
+      //       if (newRowspan !== 1 || newColspan !== 1) {
+      //         newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
+      //       }
+      //     }
+      // }
     }
 
     return newMergeInfo;
