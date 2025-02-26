@@ -28,7 +28,7 @@ export const CSS = {
   // toolbox: "x-table-toolbox",
 };
 
-type UpdateMergeInfoType = "addRow" | "addColumn" | "deleteRow" | "deleteColumn";
+type OperationType = "addRow" | "addColumn" | "deleteRow" | "deleteColumn";
 
 interface MergeState {
   rowspan: number;
@@ -45,7 +45,8 @@ export default class XTable {
   private rowCnt: number;
   private colCnt: number;
   /** Merge State
-   * - Key format: 'rowIndex,columnIndex'
+   * - key format: 'rowIndex,columnIndex'
+   * - index starts from 1
    */
   private mergeInfo: Record<string, MergeState>;
   /** Select State
@@ -80,6 +81,7 @@ export default class XTable {
     this.initColgroup();
   }
 
+  /* ---------- Utils ---------- */
   defaultCellRender = (td: HTMLTableCellElement) => {
     td.setAttribute("contenteditable", "true");
   };
@@ -99,7 +101,6 @@ export default class XTable {
     }
   }
 
-  /* ----- Utils ----- */
   /** get position index */
   getIndex(position: string) {
     return position.split(",").map(Number);
@@ -141,7 +142,7 @@ export default class XTable {
   }
 
   /** update merge info after modifying table */
-  updateMergeInfo(type: UpdateMergeInfoType, index: number) {
+  updateMergeInfo(type: OperationType, index: number) {
     const mergeInfo = JSON.parse(JSON.stringify(this.mergeInfo));
     const newMergeInfo: Record<string, MergeState> = {};
 
@@ -261,7 +262,7 @@ export default class XTable {
     return newMergeInfo;
   }
 
-  /* ----- Table Operations ----- */
+  /* ---------- Table Operations ---------- */
   addRow(index = 0, init = false) {
     const { cols } = this.getTableSize();
     const newRow = this.createRow(cols);
@@ -412,7 +413,7 @@ export default class XTable {
     }
   }
 
-  /* ----- Getters ----- */
+  /* ---------- Getters ---------- */
   getTable() {
     return {
       table: this.table,
@@ -460,7 +461,7 @@ export default class XTable {
     return data;
   }
 
-  /* ----- DOM Operations ----- */
+  /* ---------- DOM Operations ---------- */
   /**
    * Create base table elements
    */
