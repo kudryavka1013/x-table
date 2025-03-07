@@ -118,19 +118,27 @@ export default class XTable {
       newEndRow = endRow,
       newEndColumn = endColumn;
     // get merge state
+    // 先过滤掉选中范围右侧和下方的合并单元格，减少计算量
     const mergeKeys = Object.keys(this.mergeInfo).filter((key) => {
       const [row, col] = key.split(",").map(Number);
-      return row >= startRow && row <= endRow && col >= startColumn && col <= endColumn;
+      return row <= endRow && col <= endColumn;
     });
 
+    // 计算并扩大选中范围
     for (let i = 0; i < mergeKeys.length; i++) {
-      const { rowspan, colspan } = this.mergeInfo[mergeKeys[i]]!;
-      // expand range to cover merged cells
+      const { rowspan, colspan } = this.mergeInfo[mergeKeys[i]];
       const [row, col] = mergeKeys[i].split(",").map(Number);
-      newEndRow = row + rowspan - 1 > endRow ? row + rowspan - 1 : endRow;
-      newEndColumn = col + colspan - 1 > endColumn ? col + colspan - 1 : endColumn;
+      // expand range to cover merged cells
+      // 合并单元格和选中范围有重合，判断方式是合并单元格的右下角坐标是否穿过选中范围
+      if (row + rowspan - 1 >= startRow && col + colspan - 1 >= startColumn) {
+        newStartRow = Math.min(row, startRow);
+        newStartColumn = Math.min(col, startColumn);
+        newEndRow = Math.max(row + rowspan - 1, endRow);
+        newEndColumn = Math.max(col + colspan - 1, endColumn);
+      }
     }
 
+    // 选中范围未扩大，计算结束
     if (newStartRow === startRow && newStartColumn === startColumn && newEndRow === endRow && newEndColumn === endColumn) {
       return {
         startRow,
@@ -358,7 +366,7 @@ export default class XTable {
 
     const realRange = this.computeRealRange(startRow, startColumn, endRow, endColumn);
     this.selectState = {
-      ...realRange
+      ...realRange,
     };
   }
 
