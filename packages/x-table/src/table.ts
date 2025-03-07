@@ -54,9 +54,9 @@ export default class XTable {
    */
   private selectState: {
     startRow: number;
-    startCol: number;
+    startColumn: number;
     endRow: number;
-    endCol: number;
+    endColumn: number;
   };
   /* Custom cell render function */
   cellRender: (td: HTMLTableCellElement) => void;
@@ -72,9 +72,9 @@ export default class XTable {
     this.mergeInfo = {};
     this.selectState = {
       startRow: 0,
-      startCol: 0,
+      startColumn: 0,
       endRow: 0,
-      endCol: 0,
+      endColumn: 0,
     };
     this.cellRender = cellRender ? cellRender : this.defaultCellRender;
     this.initTableCells(rows);
@@ -112,7 +112,7 @@ export default class XTable {
     startColumn: number,
     endRow: number,
     endColumn: number
-  ): { startPosition: [number, number]; endPosition: [number, number] } {
+  ): { startRow: number; startColumn: number; endRow: number; endColumn: number } {
     let newStartRow = startRow,
       newStartColumn = startColumn,
       newEndRow = endRow,
@@ -133,8 +133,10 @@ export default class XTable {
 
     if (newStartRow === startRow && newStartColumn === startColumn && newEndRow === endRow && newEndColumn === endColumn) {
       return {
-        startPosition: [startRow, startColumn],
-        endPosition: [endRow, endColumn],
+        startRow,
+        startColumn,
+        endRow,
+        endColumn,
       };
     } else {
       return this.computeRealRange(newStartRow, newStartColumn, newEndRow, newEndColumn);
@@ -355,31 +357,27 @@ export default class XTable {
     let [startColumn, endColumn] = y - b >= 0 ? [b, y] : [y, b];
 
     const realRange = this.computeRealRange(startRow, startColumn, endRow, endColumn);
-    console.log(realRange);
     this.selectState = {
-      startRow: realRange.startPosition[0],
-      startCol: realRange.startPosition[1],
-      endRow: realRange.endPosition[0],
-      endCol: realRange.endPosition[1],
+      ...realRange
     };
   }
 
   mergeCells(startPosition: [number, number], endPosition: [number, number]) {
     // need to be real select range
     this.setSelectState(startPosition, endPosition);
-    const { startRow, startCol, endRow, endCol } = this.selectState;
+    const { startRow, startColumn, endRow, endColumn } = this.selectState;
     // set rowspan colspan
     // hide merged cells
     for (let i = startRow; i <= endRow; i++) {
-      for (let j = startCol; j <= endCol; j++) {
+      for (let j = startColumn; j <= endColumn; j++) {
         const cell = this.getCell(i, j);
         if (cell) {
-          if (i === startRow && j === startCol) {
+          if (i === startRow && j === startColumn) {
             cell.setAttribute("rowspan", `${endRow - startRow + 1}`);
-            cell.setAttribute("colspan", `${endCol - startCol + 1}`);
+            cell.setAttribute("colspan", `${endColumn - startColumn + 1}`);
             this.mergeInfo[`${i},${j}`] = {
               rowspan: endRow - startRow + 1,
-              colspan: endCol - startCol + 1,
+              colspan: endColumn - startColumn + 1,
             };
           } else {
             cell.classList.add(CSS.cellMerged);
