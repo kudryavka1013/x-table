@@ -58,6 +58,10 @@ function App() {
     actionRef.current?.splitCell([parseInt(x), parseInt(y)]);
   };
 
+  const logSelectState = () => {
+    console.log(actionRef.current?.getSelectState());
+  }
+
   const logData = () => {
     console.log(actionRef.current?.getTableSize());
     console.log(actionRef.current?.getMergeInfo());
@@ -97,6 +101,8 @@ function App() {
           <input type="text" id="split" />
           <button onClick={onSplit}>split</button>
         </div>
+
+        <button onClick={logSelectState}>selectState</button>
 
         <button onClick={logData}>logData</button>
       </div>

@@ -388,6 +388,7 @@ export default class XTable {
               colspan: endColumn - startColumn + 1,
             };
           } else {
+            delete this.mergeInfo[`${i},${j}`];
             cell.classList.add(CSS.cellMerged);
             cell.setAttribute("rowspan", "1");
             cell.setAttribute("colspan", "1");
@@ -449,6 +450,10 @@ export default class XTable {
 
   getMergeInfo() {
     return this.mergeInfo;
+  }
+
+  getSelectState() {
+    return this.selectState;
   }
 
   getData() {
