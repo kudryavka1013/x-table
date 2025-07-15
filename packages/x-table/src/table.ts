@@ -1,4 +1,13 @@
-import $ from "./dom";
+import { domUtils as $, tableUtils as t } from "./utils";
+
+/** Operation types for table modifications */
+type OperationType = "addRow" | "addColumn" | "deleteRow" | "deleteColumn";
+
+/** State of a merged cell */
+interface MergeState {
+  rowspan: number;
+  colspan: number;
+}
 
 export const CSS = {
   // wrapper: "x-table-wrapper",
@@ -28,27 +37,24 @@ export const CSS = {
   // toolbox: "x-table-toolbox",
 };
 
-type OperationType = "addRow" | "addColumn" | "deleteRow" | "deleteColumn";
-
-interface MergeState {
-  rowspan: number;
-  colspan: number;
-}
-
 export default class XTable {
   /* DOM Nodes */
   private table: HTMLTableElement;
   private colgroup: HTMLTableColElement;
   private tbody: HTMLTableSectionElement;
+
   /* Table Data */
   private data: string[][];
+  /* Table Size */
   private rowCnt: number;
   private colCnt: number;
+
   /** Merge State
    * - key format: 'rowIndex,columnIndex'
    * - index starts from 1
    */
   private mergeInfo: Record<string, MergeState>;
+
   /** Select State
    * start cell index and end cell index, start from 1
    */
@@ -58,18 +64,20 @@ export default class XTable {
     endRow: number;
     endColumn: number;
   };
+
   /* Custom cell render function */
   cellRender: (td: HTMLTableCellElement) => void;
 
-  constructor(data: string[][], rows: number, cols: number, cellRender?: (td: HTMLTableCellElement) => void) {
-    const { table, colgroup, tbody } = this.createBaseTable();
+  constructor(data?: string[][], mergeInfo?: Record<string, MergeState>, cellRender?: (td: HTMLTableCellElement) => void) {
+    const { fData, rows, cols } = t.formatTableData(data);
+    const { table, colgroup, tbody } = this.createTable();
     this.table = table;
     this.colgroup = colgroup;
     this.tbody = tbody;
-    this.data = data;
+    this.data = fData;
     this.rowCnt = rows;
     this.colCnt = cols;
-    this.mergeInfo = {};
+    this.mergeInfo = mergeInfo || {};
     this.selectState = {
       startRow: 0,
       startColumn: 0,
@@ -96,7 +104,7 @@ export default class XTable {
   initColgroup() {
     const { cols } = this.getTableSize();
     for (let i = 0; i < cols; i++) {
-      const col = this.createCol();
+      const col = this.createColgroupCol();
       this.colgroup.appendChild(col);
     }
   }
@@ -176,11 +184,11 @@ export default class XTable {
       // calculate new rowspan and colspan
       const [newRowspan, newColspan] = isRowOperation ? [newSpan, rspan] : [rspan, newSpan];
 
-      // 删除行列为合并单元格本体行列时，清除被合并的单元格的样式数据，无需再记录 map
+      // When deleting rows and columns that are merged cells, clear the style data of the merged cells and no longer need to record the map
       if (!isAddOperation && index === pos) {
         for (let i = 0; i < rowspan; i++) {
           for (let j = 0; j < colspan; j++) {
-            const cell = this.getCell(row + i, col + j);
+            const cell = this.getTableCell(row + i, col + j);
             if (cell) {
               cell.classList.remove(CSS.cellMerged);
             }
@@ -188,11 +196,11 @@ export default class XTable {
         }
         continue;
       }
-      // 插入的行列穿过合并单元格时，新增的单元格调整合并样式
+      // When the inserted rows and columns pass through merged cells, the newly added cells adjust the merge style
       if (isAddOperation && newSpan !== span) {
         const counter = isRowOperation ? colspan : rowspan;
         for (let i = 0; i < counter; i++) {
-          const cell = isRowOperation ? this.getCell(index, col + i) : this.getCell(row + i, index);
+          const cell = isRowOperation ? this.getTableCell(index, col + i) : this.getTableCell(row + i, index);
           if (cell) {
             cell.classList.add(CSS.cellMerged);
           }
@@ -200,16 +208,16 @@ export default class XTable {
       }
 
       /* 通用处理 */
-      // 插入/删除的行列穿过合并单元格时
+      // When the inserted/deleted rows and columns pass through merged cells
       if (newSpan !== span) {
-        // 更新合并单元格的 rowspan colspan
-        const cell = this.getCell(row, col);
+        // update mergedCell's rowspan colspan
+        const cell = this.getTableCell(row, col);
         if (cell) {
           cell.setAttribute("rowspan", `${newRowspan}`);
           cell.setAttribute("colspan", `${newColspan}`);
         }
       }
-      // 更新 map 数据
+      // update map
       if (newRowspan !== 1 || newColspan !== 1) {
         newMergeInfo[`${newRow},${newCol}`] = { ...mergeInfo[key], rowspan: newRowspan, colspan: newColspan };
       }
@@ -275,11 +283,11 @@ export default class XTable {
   /* ---------- Table Operations ---------- */
   addRow(index = 0, init = false) {
     const { cols } = this.getTableSize();
-    const newRow = this.createRow(cols);
+    const newRow = this.createTableRow(cols);
 
     if (index > 0 && index <= cols) {
       /* non-zero, find index and insert before */
-      const row = this.getRow(index);
+      const row = this.getTableRow(index);
       this.tbody.insertBefore(newRow, row);
       /* update mergeInfo */
       this.mergeInfo = this.updateMergeInfo("addRow", index);
@@ -296,10 +304,10 @@ export default class XTable {
   addColumn(index = 0) {
     const { rows, cols } = this.getTableSize();
     for (let i = 0; i < rows; i++) {
-      const td = this.createCell();
-      const curRow = this.getRow(i + 1);
+      const td = this.createTableCell();
+      const curRow = this.getTableRow(i + 1);
       if (index > 0 && index <= cols) {
-        const curTd = this.getCell(i + 1, index);
+        const curTd = this.getTableCell(i + 1, index);
         curRow?.insertBefore(td, curTd);
       } else {
         curRow?.appendChild(td);
@@ -310,7 +318,7 @@ export default class XTable {
     this.mergeInfo = this.updateMergeInfo("addColumn", index);
 
     /* update colgroup */
-    const col = this.createCol();
+    const col = this.createColgroupCol();
     if (index > 0 && index <= cols) {
       const curCol = this.colgroup.children[index - 1];
       this.colgroup.insertBefore(col, curCol);
@@ -325,7 +333,7 @@ export default class XTable {
   deleteRow(index: number) {
     const { rows } = this.getTableSize();
     if (index <= 0 || index > rows) return;
-    const row = this.getRow(index);
+    const row = this.getTableRow(index);
     if (row) {
       row.remove();
       this.rowCnt--;
@@ -340,7 +348,7 @@ export default class XTable {
     if (index <= 0 || index > cols) return;
 
     for (let i = 0; i < rows; i++) {
-      const cell = this.getCell(i + 1, index);
+      const cell = this.getTableCell(i + 1, index);
       if (cell) {
         cell.remove();
       }
@@ -349,7 +357,7 @@ export default class XTable {
     /* update mergeInfo */
     this.mergeInfo = this.updateMergeInfo("deleteColumn", index);
 
-    const col = this.getCol(index);
+    const col = this.getColgroupCol(index);
     if (col) {
       col.remove();
       this.colCnt--;
@@ -378,7 +386,7 @@ export default class XTable {
     // hide merged cells
     for (let i = startRow; i <= endRow; i++) {
       for (let j = startColumn; j <= endColumn; j++) {
-        const cell = this.getCell(i, j);
+        const cell = this.getTableCell(i, j);
         if (cell) {
           if (i === startRow && j === startColumn) {
             cell.setAttribute("rowspan", `${endRow - startRow + 1}`);
@@ -405,7 +413,7 @@ export default class XTable {
       // show merged cells
       for (let i = 0; i < rowspan; i++) {
         for (let j = 0; j < colspan; j++) {
-          const cell = this.getCell(position[0] + i, position[1] + j);
+          const cell = this.getTableCell(position[0] + i, position[1] + j);
           if (cell) {
             if (i === 0 && j === 0) {
               cell.setAttribute("rowspan", "1");
@@ -421,7 +429,8 @@ export default class XTable {
   }
 
   /* ---------- Getters ---------- */
-  getTable() {
+  /** Get table elements */
+  getTableElements() {
     return {
       table: this.table,
       colgroup: this.colgroup,
@@ -429,6 +438,7 @@ export default class XTable {
     };
   }
 
+  /** Get table size */
   getTableSize() {
     return {
       rows: this.rowCnt,
@@ -436,15 +446,17 @@ export default class XTable {
     };
   }
 
-  getRow(row: number) {
+  /** Get specific row element */
+  getTableRow(row: number = 1) {
     return this.tbody.querySelector<HTMLTableRowElement>(`tr:nth-child(${row})`);
   }
 
-  getCell(row: number, col: number) {
+  /** Get specific cell element */
+  getTableCell(row: number = 1, col: number = 1) {
     return this.tbody.querySelector<HTMLTableCellElement>(`tr:nth-child(${row}) td:nth-child(${col})`);
   }
 
-  getCol(col: number) {
+  getColgroupCol(col: number) {
     return this.colgroup.querySelector<HTMLTableColElement>(`col:nth-child(${col})`);
   }
 
@@ -462,7 +474,7 @@ export default class XTable {
     for (let i = 0; i < rows; i++) {
       const rowData: string[] = [];
       for (let j = 0; j < cols; j++) {
-        const cell = this.getCell(i + 1, j + 1);
+        const cell = this.getTableCell(i + 1, j + 1);
         if (!cell) continue;
         rowData.push(cell.innerText);
       }
@@ -476,7 +488,7 @@ export default class XTable {
   /**
    * Create base table elements
    */
-  createBaseTable = () => {
+  createTable = () => {
     const table = $.make("table", [CSS.table]);
     const colgroup = $.make("colgroup", CSS.colgroup);
     const tbody = $.make("tbody", CSS.tbody);
@@ -492,7 +504,7 @@ export default class XTable {
   /**
    * Create table td element
    */
-  createCell = (): HTMLTableCellElement => {
+  createTableCell = (): HTMLTableCellElement => {
     const td = $.make("td", CSS.cell);
     td.setAttribute("rowspan", "1");
     td.setAttribute("colspan", "1");
@@ -503,16 +515,16 @@ export default class XTable {
   /**
    * Create tr and fill td elements
    */
-  createRow = (numOfCols: number): HTMLTableRowElement => {
+  createTableRow = (numOfCols: number): HTMLTableRowElement => {
     const row = $.make("tr", CSS.row);
-    $.batchAppend(row, () => this.createCell(), numOfCols);
+    $.batchAppend(row, () => this.createTableCell(), numOfCols);
     return row;
   };
 
   /**
    * Create colgroup-col element
    */
-  createCol = (width?: number, span?: number): HTMLTableColElement => {
+  createColgroupCol = (width?: number, span?: number): HTMLTableColElement => {
     const col = $.make("col", CSS.col);
     col.style.width = width ? `${width}px` : "100px";
     if (span) {
