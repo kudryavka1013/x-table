@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import XTable from "@kudryavka1013/x-table";
+import { XTable } from "@kudryavka1013/x-table";
 import "@kudryavka1013/x-table/x-table.css";
 import { CSS } from "@kudryavka1013/x-table";
 
@@ -9,9 +9,11 @@ function App() {
 
   useEffect(() => {
     console.log("useEffect");
-    const table = new XTable([], 3, 3);
+    const table = new XTable([]);
     actionRef.current = table;
-    tableRef.current?.appendChild(table.getTable().table);
+    console.log(table)
+    console.log(table.getTableElements().table)
+    tableRef.current?.appendChild(table.getTableElements().table);
   }, []);
 
   const onAddCol = () => {
@@ -60,7 +62,7 @@ function App() {
 
   const logSelectState = () => {
     console.log(actionRef.current?.getSelectState());
-  }
+  };
 
   const logData = () => {
     console.log(actionRef.current?.getTableSize());

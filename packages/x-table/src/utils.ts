@@ -56,7 +56,7 @@ export const domUtils = {
  */
 const formatTableData = (data?: string[][]): { fData: string[][]; rows: number; cols: number } => {
   // If no data is provided, return default data, 2 rows & 2 cols
-  if (!data) {
+  if (!data || data.length === 0 || data.every((row) => row.length === 0)) {
     return {
       fData: [
         ["", ""],
@@ -80,7 +80,15 @@ const formatTableData = (data?: string[][]): { fData: string[][]; rows: number; 
   return { fData, rows, cols };
 };
 
+const isValidNumber = (value: any): boolean => {
+  return typeof value === "number" && !isNaN(value);
+};
+
+const isInteger = (value: any): boolean => {
+  return Number.isInteger(value);
+};
 
 export const tableUtils = {
   formatTableData,
+  isValidNumber,
 };

@@ -1,13 +1,5 @@
+import { MergeState, OperationType } from "./types";
 import { domUtils as $, tableUtils as t } from "./utils";
-
-/** Operation types for table modifications */
-type OperationType = "addRow" | "addColumn" | "deleteRow" | "deleteColumn";
-
-/** State of a merged cell */
-interface MergeState {
-  rowspan: number;
-  colspan: number;
-}
 
 export const CSS = {
   // wrapper: "x-table-wrapper",
@@ -126,18 +118,18 @@ export default class XTable {
       newEndRow = endRow,
       newEndColumn = endColumn;
     // get merge state
-    // 先过滤掉选中范围右侧和下方的合并单元格，减少计算量
+    // First filter out the merged cells to the right and below the selected range to reduce the amount of calculation
     const mergeKeys = Object.keys(this.mergeInfo).filter((key) => {
       const [row, col] = key.split(",").map(Number);
       return row <= endRow && col <= endColumn;
     });
 
-    // 计算并扩大选中范围
+    // Calculate and expand the selected range
     for (let i = 0; i < mergeKeys.length; i++) {
       const { rowspan, colspan } = this.mergeInfo[mergeKeys[i]];
       const [row, col] = mergeKeys[i].split(",").map(Number);
       // expand range to cover merged cells
-      // 合并单元格和选中范围有重合，判断方式是合并单元格的右下角坐标是否穿过选中范围
+      // The merged cell and the selected range overlap, determined by whether the bottom-right corner of the merged cell crosses the selected range
       if (row + rowspan - 1 >= startRow && col + colspan - 1 >= startColumn) {
         newStartRow = Math.min(row, startRow);
         newStartColumn = Math.min(col, startColumn);
@@ -146,7 +138,7 @@ export default class XTable {
       }
     }
 
-    // 选中范围未扩大，计算结束
+    // The selected range has not expanded, and the calculation ends
     if (newStartRow === startRow && newStartColumn === startColumn && newEndRow === endRow && newEndColumn === endColumn) {
       return {
         startRow,
@@ -174,7 +166,7 @@ export default class XTable {
       // revert position if need
       const [pos, rPos] = isRowOperation ? [row, col] : [col, row];
       // revert span if need
-      const [span, rspan] = isRowOperation ? [rowspan, colspan] : [colspan, rowspan];
+      const [span, rSpan] = isRowOperation ? [rowspan, colspan] : [colspan, rowspan];
       // calculate new position
       const newPos = isAddOperation ? (index <= pos ? pos + 1 : pos) : index <= pos ? pos - 1 : pos;
       // calculate new row and column index
@@ -182,7 +174,7 @@ export default class XTable {
       // calculate new span
       const newSpan = index > pos && index <= pos - 1 + span ? (isAddOperation ? span + 1 : span - 1) : span;
       // calculate new rowspan and colspan
-      const [newRowspan, newColspan] = isRowOperation ? [newSpan, rspan] : [rspan, newSpan];
+      const [newRowspan, newColspan] = isRowOperation ? [newSpan, rSpan] : [rSpan, newSpan];
 
       // When deleting rows and columns that are merged cells, clear the style data of the merged cells and no longer need to record the map
       if (!isAddOperation && index === pos) {
@@ -288,9 +280,11 @@ export default class XTable {
     if (index > 0 && index <= cols) {
       /* non-zero, find index and insert before */
       const row = this.getTableRow(index);
-      this.tbody.insertBefore(newRow, row);
-      /* update mergeInfo */
-      this.mergeInfo = this.updateMergeInfo("addRow", index);
+      if (row) {
+        this.tbody.insertBefore(newRow, row);
+        /* update mergeInfo */
+        this.mergeInfo = this.updateMergeInfo("addRow", index);
+      }
     } else {
       /* zero, add row to the end */
       this.tbody.appendChild(newRow);
@@ -308,7 +302,12 @@ export default class XTable {
       const curRow = this.getTableRow(i + 1);
       if (index > 0 && index <= cols) {
         const curTd = this.getTableCell(i + 1, index);
-        curRow?.insertBefore(td, curTd);
+        if (curTd) {
+          curRow?.insertBefore(td, curTd);
+        } else {
+          console.warn("XTable: invalid cell index");
+          return;
+        }
       } else {
         curRow?.appendChild(td);
       }
@@ -332,7 +331,10 @@ export default class XTable {
 
   deleteRow(index: number) {
     const { rows } = this.getTableSize();
-    if (index <= 0 || index > rows) return;
+    if (!t.isValidNumber(index) || index <= 0 || index > rows || rows <= 1) {
+      console.warn("XTable: invalid row index or is last row");
+      return;
+    }
     const row = this.getTableRow(index);
     if (row) {
       row.remove();
@@ -345,7 +347,10 @@ export default class XTable {
 
   deleteColumn(index: number) {
     const { rows, cols } = this.getTableSize();
-    if (index <= 0 || index > cols) return;
+    if (!t.isValidNumber(index) || index <= 0 || index > cols || cols <= 1) {
+      console.warn("XTable: invalid column index or is last column");
+      return;
+    }
 
     for (let i = 0; i < rows; i++) {
       const cell = this.getTableCell(i + 1, index);
@@ -448,12 +453,23 @@ export default class XTable {
 
   /** Get specific row element */
   getTableRow(row: number = 1) {
-    return this.tbody.querySelector<HTMLTableRowElement>(`tr:nth-child(${row})`);
+    const tr = this.tbody.rows[row - 1];
+    if (!tr) {
+      console.warn("XTable: invalid row index");
+      return undefined;
+    }
+
+    return tr;
   }
 
   /** Get specific cell element */
   getTableCell(row: number = 1, col: number = 1) {
-    return this.tbody.querySelector<HTMLTableCellElement>(`tr:nth-child(${row}) td:nth-child(${col})`);
+    const td = this.tbody.rows[row - 1]?.cells[col - 1];
+    if (!td) {
+      console.warn("XTable: invalid cell index");
+      return undefined;
+    }
+    return td;
   }
 
   getColgroupCol(col: number) {
@@ -469,20 +485,30 @@ export default class XTable {
   }
 
   getData() {
+    const data = Array.from(this.tbody.rows, (tr) => Array.from(tr.cells, (cell) => cell.innerHTML));
+    // check data
     const { rows, cols } = this.getTableSize();
-    const data: string[][] = [];
-    for (let i = 0; i < rows; i++) {
-      const rowData: string[] = [];
-      for (let j = 0; j < cols; j++) {
-        const cell = this.getTableCell(i + 1, j + 1);
-        if (!cell) continue;
-        rowData.push(cell.innerText);
-      }
-      data.push(rowData);
+    if (data.length !== rows || data.some((row) => row.length !== cols)) {
+      console.warn("Table data is inconsistent with table size.");
     }
-    console.log(this.data);
     return data;
   }
+
+  // getStructureData() {
+  //   const data = Array.from(this.tbody.rows, (tr) =>
+  //     Array.from(tr.cells, (cell) => ({
+  //       content: cell.innerHTML,
+  //       rowspan: cell.rowSpan,
+  //       colspan: cell.colSpan,
+  //     }))
+  //   );
+  //   // check data
+  //   const { rows, cols } = this.getTableSize();
+  //   if (data.length !== rows || data.some((row) => row.length !== cols)) {
+  //     console.warn("Table data is inconsistent with table size.");
+  //   }
+  //   return data;
+  // }
 
   /* ---------- DOM Operations ---------- */
   /**
