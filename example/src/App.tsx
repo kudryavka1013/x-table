@@ -9,10 +9,10 @@ function App() {
 
   useEffect(() => {
     console.log("useEffect");
-    const table = new XTable([]);
+    const table = new XTable([["1"], ["2"]]);
     actionRef.current = table;
-    console.log(table)
-    console.log(table.getTableElements().table)
+    console.log(table);
+    console.log(table.getTableElements().table);
     tableRef.current?.appendChild(table.getTableElements().table);
   }, []);
 

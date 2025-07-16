@@ -1,7 +1,19 @@
 .x-table-cell {
   border: 1px solid #262626;
-  height: 40px;
+  padding: 8px;
+  min-height: 39px;
+  min-width: 50px;
 }
+
 .x-table-cell--merged {
   display: none;
+}
+
+.x-table {
+  table-layout: fixed;
+}
+
+.x-table-cell-text-block {
+  outline: none;
+  font-size: 13px;
 }

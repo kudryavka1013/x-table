@@ -13,6 +13,7 @@ export const CSS = {
   row: "x-table-row",
   cell: "x-table-cell",
   cellMerged: "x-table-cell--merged",
+  cellTextBlock: "x-table-cell-text-block",
   // cellContentWrapper: "x-cell-content-wrapper",
   // cellSafeArea: "x-cell-safe-area",
   // cellContentBlock: "x-cell-content-block",
@@ -30,16 +31,17 @@ export const CSS = {
 };
 
 export default class XTable {
+  // #region ---------- Variables -----------------
   /* DOM Nodes */
-  private table: HTMLTableElement;
-  private colgroup: HTMLTableColElement;
-  private tbody: HTMLTableSectionElement;
+  private table!: HTMLTableElement;
+  private colgroup!: HTMLTableColElement;
+  private tbody!: HTMLTableSectionElement;
 
   /* Table Data */
-  private data: string[][];
+  private data!: string[][];
   /* Table Size */
-  private rowCnt: number;
-  private colCnt: number;
+  private rowCnt!: number;
+  private colCnt!: number;
 
   /** Merge State
    * - key format: 'rowIndex,columnIndex'
@@ -58,56 +60,54 @@ export default class XTable {
   };
 
   /* Custom cell render function */
-  cellRender: (td: HTMLTableCellElement) => void;
+  cellRender: (data?: string) => HTMLElement;
 
-  constructor(data?: string[][], mergeInfo?: Record<string, MergeState>, cellRender?: (td: HTMLTableCellElement) => void) {
+  // #endregion
+
+  // #region ---------- Inner Functions -----------
+  constructor(data?: string[][], mergeInfo?: Record<string, MergeState>, cellRender?: (data?: string) => HTMLElement) {
     const { fData, rows, cols } = t.formatTableData(data);
-    const { table, colgroup, tbody } = this.createTable();
+    const { table, colgroup, tbody } = this.createBaseTable();
     this.table = table;
     this.colgroup = colgroup;
     this.tbody = tbody;
     this.data = fData;
     this.rowCnt = rows;
     this.colCnt = cols;
+    this.cellRender = cellRender ? cellRender : this.defaultCellRender;
+
+    this.initTableByData();
+
+    // TODO: Implement merge info
     this.mergeInfo = mergeInfo || {};
+    // this.initMergeState();
+
     this.selectState = {
       startRow: 0,
       startColumn: 0,
       endRow: 0,
       endColumn: 0,
     };
-    this.cellRender = cellRender ? cellRender : this.defaultCellRender;
-    this.initTableCells(rows);
-    this.initColgroup();
   }
 
-  /* ---------- Utils ---------- */
-  defaultCellRender = (td: HTMLTableCellElement) => {
-    td.setAttribute("contenteditable", "true");
-  };
-
-  initTableCells(rows: number) {
-    /* fill TRs and TDs */
-    for (let i = 0; i < rows; i++) {
-      this.addRow(0, true);
-    }
+  /** Default cell render, include one edit unit */
+  private defaultCellRender(data?: string): HTMLElement {
+    const div = $.make("div", CSS.cellTextBlock);
+    div.setAttribute("contenteditable", "true");
+    div.innerHTML = data || "<br>";
+    return div;
   }
 
-  initColgroup() {
-    const { cols } = this.getTableSize();
-    for (let i = 0; i < cols; i++) {
-      const col = this.createColgroupCol();
-      this.colgroup.appendChild(col);
-    }
-  }
-
-  /** get position index */
-  getIndex(position: string) {
-    return position.split(",").map(Number);
+  /** Initialize table by data */
+  private initTableByData() {
+    const newRows = Array.from({ length: this.rowCnt }, (_, i) => this.createTableRow(this.colCnt, this.data[i]));
+    $.append(this.tbody, newRows);
+    const newCols = Array.from({ length: this.colCnt }, () => this.createColgroupCol());
+    $.append(this.colgroup, newCols);
   }
 
   /** compute real select range by merge state */
-  computeRealRange(
+  private computeRealRange(
     startRow: number,
     startColumn: number,
     endRow: number,
@@ -152,7 +152,7 @@ export default class XTable {
   }
 
   /** update merge info after modifying table */
-  updateMergeInfo(type: OperationType, index: number) {
+  private updateMergeInfo(type: OperationType, index: number) {
     const mergeInfo = JSON.parse(JSON.stringify(this.mergeInfo));
     const newMergeInfo: Record<string, MergeState> = {};
 
@@ -160,7 +160,7 @@ export default class XTable {
       const isRowOperation = type === "addRow" || type === "deleteRow";
       const isAddOperation = type === "addRow" || type === "addColumn";
       // get row and column index
-      const [row, col] = this.getIndex(key);
+      const [row, col] = t.getIndex(key);
       // get rowspan and colspan
       const { rowspan, colspan } = mergeInfo[key];
       // revert position if need
@@ -271,9 +271,10 @@ export default class XTable {
 
     return newMergeInfo;
   }
+  // #endregion
 
-  /* ---------- Table Operations ---------- */
-  addRow(index = 0, init = false) {
+  // #region ---------- Table Operations ----------
+  addRow(index = 0) {
     const { cols } = this.getTableSize();
     const newRow = this.createTableRow(cols);
 
@@ -290,9 +291,7 @@ export default class XTable {
       this.tbody.appendChild(newRow);
     }
     /* update counter */
-    if (!init) {
-      this.rowCnt++;
-    }
+    this.rowCnt++;
   }
 
   addColumn(index = 0) {
@@ -331,7 +330,7 @@ export default class XTable {
 
   deleteRow(index: number) {
     const { rows } = this.getTableSize();
-    if (!t.isValidNumber(index) || index <= 0 || index > rows || rows <= 1) {
+    if (!t.isInteger(index) || index > rows || rows <= 1) {
       console.warn("XTable: invalid row index or is last row");
       return;
     }
@@ -347,7 +346,7 @@ export default class XTable {
 
   deleteColumn(index: number) {
     const { rows, cols } = this.getTableSize();
-    if (!t.isValidNumber(index) || index <= 0 || index > cols || cols <= 1) {
+    if (!t.isInteger(index) || index > cols || cols <= 1) {
       console.warn("XTable: invalid column index or is last column");
       return;
     }
@@ -432,8 +431,9 @@ export default class XTable {
       }
     }
   }
+  // #endregion
 
-  /* ---------- Getters ---------- */
+  // #region ---------- Data Getters --------------
   /** Get table elements */
   getTableElements() {
     return {
@@ -510,11 +510,13 @@ export default class XTable {
   //   return data;
   // }
 
-  /* ---------- DOM Operations ---------- */
+  // #endregion
+
+  // #region ---------- DOM Creators --------------
   /**
    * Create base table elements
    */
-  createTable = () => {
+  createBaseTable = () => {
     const table = $.make("table", [CSS.table]);
     const colgroup = $.make("colgroup", CSS.colgroup);
     const tbody = $.make("tbody", CSS.tbody);
@@ -530,32 +532,32 @@ export default class XTable {
   /**
    * Create table td element
    */
-  createTableCell = (): HTMLTableCellElement => {
+  createTableCell = (data?: string): HTMLTableCellElement => {
     const td = $.make("td", CSS.cell);
     td.setAttribute("rowspan", "1");
     td.setAttribute("colspan", "1");
-    this.cellRender(td);
+    const renderUnit = this.cellRender(data);
+    td.appendChild(renderUnit);
     return td;
   };
 
   /**
    * Create tr and fill td elements
    */
-  createTableRow = (numOfCols: number): HTMLTableRowElement => {
+  createTableRow = (numOfCols: number, data?: string[]): HTMLTableRowElement => {
     const row = $.make("tr", CSS.row);
-    $.batchAppend(row, () => this.createTableCell(), numOfCols);
+    $.appendByGenerator(row, (i) => this.createTableCell(data?.[i]), numOfCols);
     return row;
   };
 
   /**
    * Create colgroup-col element
    */
-  createColgroupCol = (width?: number, span?: number): HTMLTableColElement => {
+  createColgroupCol = (width?: number): HTMLTableColElement => {
     const col = $.make("col", CSS.col);
-    col.style.width = width ? `${width}px` : "100px";
-    if (span) {
-      col.setAttribute("span", `${span}`);
-    }
+    col.setAttribute("width", width ? `${width}` : "100");
     return col;
   };
+
+  // #endregion
 }

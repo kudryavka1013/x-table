@@ -11,24 +11,32 @@ const make = <T extends keyof HTMLElementTagNameMap>(tagName: T, classnames?: st
  * @return Parent element
  */
 const append = <T extends HTMLElement | DocumentFragment>(parentElem: T, elem: HTMLElement | HTMLElement[]) => {
-  Array.isArray(elem) ? elem.forEach((i) => parentElem.append(i)) : parentElem.append(elem);
+  const fragment = document.createDocumentFragment();
+  Array.isArray(elem) ? elem.forEach((i) => fragment.append(i)) : fragment.append(elem);
+  parentElem.appendChild(fragment);
   return parentElem;
 };
 
 /** batch append elements by generator function
  * @return Parent element
  */
-const batchAppend = (parentElem: HTMLElement | DocumentFragment, generator: () => HTMLElement | HTMLElement[], count = 1) => {
+const appendByGenerator = (
+  parentElem: HTMLElement | DocumentFragment,
+  generator: (index: number) => HTMLElement | HTMLElement[],
+  count = 1
+) => {
+  const fragment = document.createDocumentFragment();
   for (let c = 0; c < count; c++) {
-    append(parentElem, generator());
+    append(fragment, generator(c));
   }
+  parentElem.appendChild(fragment);
   return parentElem;
 };
 
 /** Combine elements to a chain structure
  * @return The first element
  */
-const linkAppend = (...elems: HTMLElement[]) => {
+const appendAsChain = (...elems: HTMLElement[]) => {
   if (elems.length === 0) return null;
   elems.reduce((p, c) => p.appendChild(c));
   return elems[0].parentElement;
@@ -45,8 +53,8 @@ const addClass = (elem: HTMLElement, classnames: string | string[]) => {
 export const domUtils = {
   make,
   append,
-  batchAppend,
-  linkAppend,
+  appendByGenerator,
+  appendAsChain,
   addClass,
 };
 
@@ -88,7 +96,14 @@ const isInteger = (value: any): boolean => {
   return Number.isInteger(value);
 };
 
+/** split position index */
+const getIndex = (position: string) => {
+  return position.split(",").map(Number);
+};
+
 export const tableUtils = {
   formatTableData,
   isValidNumber,
+  isInteger,
+  getIndex,
 };
